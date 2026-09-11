@@ -8,11 +8,11 @@ Trabalho acadêmico desenvolvido para a disciplina de **Sistemas Operacionais** 
 
 Filipe da Silva Pereira
 
-Alice 
+Alice Borstmann Koepp
 
-Júlia Tietbohl
+Júlia Teixeira Tietbohl
 
-Matheus
+Matheus Silva de Lima
 
 ---
 
