@@ -1,0 +1,16 @@
+# Binarios compilados
+sequencial
+paralelo
+*.exe
+*.o
+*.out
+
+# Sanitizers e temporarios
+*_san
+*_tsan
+
+# IDE e editores
+.vscode/
+.idea/
+*.swp
+*~
