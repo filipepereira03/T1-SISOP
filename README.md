@@ -7,8 +7,11 @@ Trabalho acadêmico desenvolvido para a disciplina de **Sistemas Operacionais** 
 ## Autores
 
 Filipe da Silva Pereira
+
 Alice 
+
 Júlia Tietbohl
+
 Matheus
 
 ---
