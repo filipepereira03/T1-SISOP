@@ -9,8 +9,10 @@
 
 ## Autores
 
-- [Deixar em branco conforme especificação / preencher com nome e matrícula dos integrantes]
-
+- Filipe da Silva Pereira
+- Júlia Teixeira Tietbohl 
+- Alice Borstmann Koepp
+- Matheus Silva de Lima
 ---
 
 ## 1. Contextualização e Objetivos de Aprendizagem
