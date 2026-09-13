@@ -260,22 +260,7 @@ No experimento com a matriz **Exemplo 1 ($5 \times 5$, 25 células)**:
 
 ---
 
-## 8. Apresentação em Aula (10 Minutos) e Slides em PDF
-
-Os slides completos para a apresentação obrigatória foram gerados e armazenados em [`slides/apresentacao.pdf`](file:///c:/Users/F/T1-SISOP/slides/apresentacao.pdf) (Requisito 50), organizados conforme a distribuição sugerida na Seção 11:
-
-| Minuto | Tema do Slide | Foco da Apresentação |
-| :---: | :--- | :--- |
-| **1 min** | **Problema e Estratégia Escolhida** | Definição da matriz binária, regra de conectividade 8 e o desafio da divisão concorrente. |
-| **2 min** | **Implementação Sequencial** | Flood fill iterativo com pilha explícita na *heap*, eliminação de estouro de pilha e padrão ouro. |
-| **2 min** | **Decomposição e Threads** | Divisão por faixas de linhas, localidade espacial de cache e IDs locais calculados sem locks. |
-| **2 min** | **Consolidação e Demonstração** | Barreira portável, unificação de fronteiras com Union-Find (DSU) protegido por mutex e transitividade. |
-| **2 min** | **Testes e Desempenho** | Tabela 7.1, medições repetidas (10 rodadas), aceleração e a explicação do Requisito 38. |
-| **1 min** | **Conclusões** | Demonstração no terminal com `--visual` e encerramento. |
-
----
-
-## 9. Referências Bibliográficas e Ferramentas
+## 8. Referências Bibliográficas e Ferramentas
 
 Em cumprimento ao item 13 do enunciado, listam-se as referências e ferramentas utilizadas:
 1. **Padrão ANSI C (C89/C90):** ISO/IEC 9899:1990 — *Programming Languages — C*.
