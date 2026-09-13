@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Apresentação - Contagem Paralela de Objetos em Matriz Binária</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    @page {
+      size: 16in 9in;
+      margin: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0b0f19;
+      color: #f1f5f9;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .slide {
+      width: 16in;
+      height: 9in;
+      page-break-after: always;
+      position: relative;
+      padding: 3rem 4rem;
+      background: radial-gradient(circle at 10% 20%, #172554 0%, #0b0f19 90%);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+      padding-bottom: 1.2rem;
+    }
+
+    .header .institution {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #60a5fa;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .header .time-badge {
+      background: rgba(30, 58, 138, 0.6);
+      border: 1px solid #3b82f6;
+      color: #93c5fd;
+      padding: 0.4rem 1.2rem;
+      border-radius: 9999px;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .title {
+      font-size: 2.8rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin: 1.5rem 0 0.5rem 0;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      font-size: 1.4rem;
+      color: #94a3b8;
+      margin-bottom: 1.5rem;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2.5rem;
+      flex-grow: 1;
+      margin-top: 1rem;
+    }
+
+    .card {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      border-radius: 1.2rem;
+      padding: 1.8rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      backdrop-filter: blur(8px);
+    }
+
+    .card h3 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    ul {
+      list-style: none;
+    }
+
+    li {
+      font-size: 1.15rem;
+      line-height: 1.6;
+      margin-bottom: 0.8rem;
+      position: relative;
+      padding-left: 1.6rem;
+      color: #cbd5e1;
+    }
+
+    li::before {
+      content: "•";
+      color: #3b82f6;
+      font-size: 1.8rem;
+      position: absolute;
+      left: 0;
+      top: -0.3rem;
+    }
+
+    .code-box {
+      font-family: 'JetBrains Mono', monospace;
+      background: #030712;
+      border: 1px solid #1e293b;
+      border-radius: 0.8rem;
+      padding: 1rem;
+      font-size: 0.95rem;
+      color: #38bdf8;
+      line-height: 1.5;
+      margin-top: 0.8rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 1.1rem;
+    }
+
+    th, td {
+      padding: 0.8rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid #334155;
+    }
+
+    th {
+      background: rgba(15, 23, 42, 0.8);
+      color: #60a5fa;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.95rem;
+    }
+
+    tr:hover {
+      background: rgba(51, 65, 85, 0.3);
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(51, 65, 85, 0.6);
+      padding-top: 1rem;
+      font-size: 0.95rem;
+      color: #64748b;
+    }
+
+    .tag-ok {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: 0.2rem 0.6rem;
+      border-radius: 0.4rem;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SLIDE 1: CAPA -->
+  <div class="slide" style="justify-content: center; text-align: center; background: radial-gradient(circle at center, #1e3a8a 0%, #030712 100%);">
+    <div style="max-width: 12in; margin: 0 auto;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">
+        Pontifícia Universidade Católica do Rio Grande do Sul (PUCRS)
+      </div>
+      <div style="font-size: 1.2rem; color: #94a3b8; margin-bottom: 2.5rem;">
+        Escola Politécnica | Sistemas Operacionais – 2026/II | Prof. Filipo Mór
+      </div>
+      <h1 style="font-size: 3.8rem; font-weight: 900; color: #ffffff; line-height: 1.15; margin-bottom: 2rem;">
+        Contagem Paralela de Objetos<br>em uma Matriz Binária
+      </h1>
+      <p style="font-size: 1.6rem; color: #38bdf8; font-weight: 600; margin-bottom: 3rem;">
+        Implementações Sequencial e Paralela com Pthreads e Union-Find (DSU) em ANSI C (C89/C90)
+      </p>
+      <div style="display: inline-block; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; padding: 1rem 3rem; border-radius: 1rem;">
+        <div style="font-size: 1.1rem; color: #94a3b8;">Apresentação do Trabalho Prático 1 (Tempo: 10 minutos)</div>
+        <div style="font-size: 1.3rem; font-weight: 700; color: #f8fafc; margin-top: 0.3rem;">Repositório Público: github.com/filipepereira03/T1-SISOP</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: CONTEXTO E PROBLEMA -->
+  <div class="slide">
+    <div class="header">
+      <span class="institution">PUCRS | Sistemas Operacionais</span>
+      <span class="time-badge">Minuto 1: Contexto e Problema</span>
+    </div>
+    <div>
+      <h2 class="title">1. O Desafio e a Conectividade 8</h2>
+      <p class="subtitle">Definição do problema e desafio da divisão concorrente de dados espaciais</p>
+    </div>
+    <div class="content-grid">
+      <div class="card">
+        <h3>🎯 O que é um Objeto?</h3>
+        <ul>
+          <li><strong>Matriz Binária:</strong> Valores <code>0</code> representam o fundo e <code>1</code> representam células de primeiro plano.</li>
+          <li><strong>Conectividade 8 (8-Vizinhança):</strong> Duas células de valor <code>1</code> pertencem ao mesmo objeto se tocam por <strong>arestas</strong> (horizontal/vertical) OU por <strong>cantos</strong> (diagonais).</li>
+          <li><strong>Componente Conexo Maximal:</strong> Cada objeto é um agrupamento fechado onde todos os pontos com 1 se alcançam mutuamente.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>⚡ O Desafio Central da Paralelização</h3>
+        <ul>
+          <li><strong>Corte nas Fronteiras:</strong> Um objeto de grande escala pode atravessar várias faixas atribuídas a threads diferentes.</li>
+          <li><strong>Falha da Soma Simples:</strong> Apenas somar a quantidade de objetos encontrados por cada thread gera <strong>contagens duplicadas</strong> e resultados inconsistentes.</li>
+          <li><strong>Objetivo:</strong> Descobrir componentes locais de forma concorrente e <strong>unificar deterministicamente</strong> as regiões que se tocam nas bordas.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Trabalho Prático 1 - Sistemas Operacionais</span>
+      <span>Slide 2 / 8</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: IMPLEMENTAÇÃO SEQUENCIAL -->
+  <div class="slide">
+    <div class="header">
+      <span class="institution">PUCRS | Sistemas Operacionais</span>
+      <span class="time-badge">Minutos 2-3: Referência Sequencial</span>
+    </div>
+    <div>
+      <h2 class="title">2. Implementação Sequencial de Referência</h2>
+      <p class="subtitle">Flood Fill iterativo com pilha explícita e prevenção de Stack Overflow</p>
+    </div>
+    <div class="content-grid">
+      <div class="card">
+        <h3>🛡️ Eliminação de Recursão Profunda</h3>
+        <ul>
+          <li><strong>Risco Recursivo:</strong> Em matrizes de 1.000.000 de células, um objeto longo pode disparar recursão de milhares de níveis, estourando a pilha de execução (<em>Stack Overflow</em>).</li>
+          <li><strong>Solução:</strong> Pilha dinâmica explícita (<code>Stack</code>) alocada na <strong>heap</strong> com redimensionamento sob demanda.</li>
+          <li><strong>Complexidade Ótima:</strong> $O(N)$ em tempo e $O(N)$ em memória, garantindo execução ultrarrápida (1 a 3 microssegundos em matrizes pequenas).</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>🔍 Mecanismo de Visitação e Ground Truth</h3>
+        <ul>
+          <li><strong>Marcação no Empilhamento:</strong> Cada célula é marcada como visitada no momento exato em que é adicionada à pilha, impedindo que múltiplos vizinhos a empilhem novamente.</li>
+          <li><strong>Padrão Ouro de Correção:</strong> A versão sequencial processa 100% da matriz sem interferências e serve como base comparativa obrigatória para a versão paralela.</li>
+          <li><strong>Padrão ANSI C (C89/C90):</strong> Zero dependências de C99/C11, compatível com Linux e macOS.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Trabalho Prático 1 - Sistemas Operacionais</span>
+      <span>Slide 3 / 8</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 4: DECOMPOSIÇÃO DE DOMÍNIO -->
+  <div class="slide">
+    <div class="header">
+      <span class="institution">PUCRS | Sistemas Operacionais</span>
+      <span class="time-badge">Minutos 4-5: Decomposição e Threads</span>
+    </div>
+    <div>
+      <h2 class="title">3. Decomposição de Domínio (Row-Striping)</h2>
+      <p class="subtitle">Divisão por faixas de linhas, localidade de cache e rotulagem local</p>
+    </div>
+    <div class="content-grid">
+      <div class="card">
+        <h3>📐 Como as Linhas são Fatiadas?</h3>
+        <ul>
+          <li>A matriz de $R$ linhas é dividida entre $T$ threads em blocos contíguos de linhas $[start\_row, end\_row)$.</li>
+          <li><strong>Distribuição Justa do Resto:</strong>
+            <div class="code-box">
+base_rows = rows / num_threads;
+remainder = rows % num_threads;
+count = base_rows + (thread_id < remainder ? 1 : 0);
+            </div>
+          </li>
+          <li><strong>Localidade Espacial de Cache:</strong> Em C, matrizes são <em>Row-Major</em>. Linhas contíguas garantem acessos sequenciais rápidos na memória cache L1/L2.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>🏷️ Fase 1: Flood Fill Concorrente</h3>
+        <ul>
+          <li>Cada thread executa seu próprio flood fill restrito à sua faixa.</li>
+          <li><strong>ID Único sem Locks:</strong> Cada novo componente local recebe um ID único baseado na posição da sua célula inicial:
+            <div class="code-box">comp_id = r * cols + c + 1; /* Estritamente positivo */</div>
+          </li>
+          <li>Zero comunicação e zero contenção de memória durante a Fase 1! As threads trabalham com paralelismo máximo.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Trabalho Prático 1 - Sistemas Operacionais</span>
+      <span>Slide 4 / 8</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 5: CONSOLIDAÇÃO COM DSU -->
+  <div class="slide">
+    <div class="header">
+      <span class="institution">PUCRS | Sistemas Operacionais</span>
+      <span class="time-badge">Minutos 6-7: Consolidação e DSU</span>
+    </div>
+    <div>
+      <h2 class="title">4. Consolidação de Fronteiras com Union-Find (DSU)</h2>
+      <p class="subtitle">Barreira de sincronização portável, conectividade 8 e resolução transitiva</p>
+    </div>
+    <div class="content-grid">
+      <div class="card">
+        <h3>🤝 Barreira Portável e Inspeção de Bordas</h3>
+        <ul>
+          <li><strong>Compatibilidade macOS/Linux:</strong> Implementação de barreira com <code>pthread_mutex_t</code> e <code>pthread_cond_t</code> (pois <code>pthread_barrier_t</code> não existe no macOS).</li>
+          <li><strong>Checagem Concorrente de Fronteira:</strong> Cada thread $t$ verifica as células da sua última linha ($r_{top}$) contra as células da primeira linha da thread seguinte ($r_{bot}$):
+            <ul>
+              <li>Diagonal esquerda: $(r_{bot}, c - 1)$</li>
+              <li>Vertical abaixo: $(r_{bot}, c)$</li>
+              <li>Diagonal direita: $(r_{bot}, c + 1)$</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>🌲 Por que Union-Find (DSU) com Mutex?</h3>
+        <ul>
+          <li>Ao detectar conexão entre rótulos $L_{top}$ e $L_{bot}$, executa:
+            <div class="code-box">
+pthread_mutex_lock(&dsu_mutex);
+dsu_union(&dsu, label_top, label_bot);
+pthread_mutex_unlock(&dsu_mutex);
+            </div>
+          </li>
+          <li><strong>Transitividade Automática:</strong> Objetos em forma de "U" ou serpentes que cruzam 3 ou 4 faixas são fundidos na mesma raiz canônica.</li>
+          <li><strong>Contagem Global Final:</strong> Itera sobre as raízes canônicas com <code>dsu_find</code>, contabilizando cada objeto exatamente 1 vez!</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Trabalho Prático 1 - Sistemas Operacionais</span>
+      <span>Slide 5 / 8</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 6: TESTES OBRIGATÓRIOS -->
+  <div class="slide">
+    <div class="header">
+      <span class="institution">PUCRS | Sistemas Operacionais</span>
+      <span class="time-badge">Minuto 8: Testes Obrigatórios</span>
+    </div>
+    <div>
+      <h2 class="title">5. Tabela 7.1 - Validação das Matrizes Obrigatórias</h2>
+      <p class="subtitle">Resultados 100% exatos com as 5 matrizes oficiais do enunciado da PUCRS</p>
+    </div>
+    <div class="card" style="margin-top: 1rem;">
+      <table>
+        <thead>
+          <tr>
+            <th>Exemplo</th>
+            <th>Dimensões</th>
+            <th>Objetos Esperados</th>
+            <th>Sequencial</th>
+            <th>Paralelo (4 Threads)</th>
+            <th>Status</th>
+            <th>Características Testadas</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Exemplo 1</strong></td>
+            <td>5 x 5</td>
+            <td><strong>3</strong></td>
+            <td>3</td>
+            <td>3</td>
+            <td><span class="tag-ok">OK</span></td>
+            <td>Casos compactos e referência básica</td>
+          </tr>
+          <tr>
+            <td><strong>Exemplo 2</strong></td>
+            <td>6 x 8</td>
+            <td><strong>4</strong></td>
+            <td>4</td>
+            <td>4</td>
+            <td><span class="tag-ok">OK</span></td>
+            <td>Objeto atravessando fronteiras</td>
+          </tr>
+          <tr>
+            <td><strong>Exemplo 3</strong></td>
+            <td>8 x 8</td>
+            <td><strong>5</strong></td>
+            <td>5</td>
+            <td>5</td>
+            <td><span class="tag-ok">OK</span></td>
+            <td>Encontro de 4 blocos e conexões diagonais</td>
+          </tr>
+          <tr>
+            <td><strong>Exemplo 4</strong></td>
+            <td>9 x 12</td>
+            <td><strong>6</strong></td>
+            <td>6</td>
+            <td>6</td>
+            <td><span class="tag-ok">OK</span></td>
+            <td>Objetos irregulares ocupando múltiplos blocos</td>
+          </tr>
+          <tr>
+            <td><strong>Exemplo 5</strong></td>
+            <td>12 x 12</td>
+            <td><strong>7</strong></td>
+            <td>7</td>
+            <td>7</td>
+            <td><span class="tag-ok">OK</span></td>
+            <td>Travessia diagonal longa ao longo de 3 faixas</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top: 1.5rem; display: flex; gap: 2rem; font-size: 1.1rem; color: #94a3b8;">
+        <div>✔️ <strong>AddressSanitizer:</strong> Zero vazamentos de memória (0 memory leaks).</div>
+        <div>✔️ <strong>ThreadSanitizer:</strong> Zero condições de corrida (0 race conditions).</div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Trabalho Prático 1 - Sistemas Operacionais</span>
+      <span>Slide 6 / 8</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 7: DESEMPENHO E PONTO 38 -->
+  <div class="slide">
+    <div class="header">
+      <span class="institution">PUCRS | Sistemas Operacionais</span>
+      <span class="time-badge">Minuto 9: Desempenho e Ponto 38</span>
+    </div>
+    <div>
+      <h2 class="title">6. Desempenho e o Enigma do Ponto 38</h2>
+      <p class="subtitle">Medições repetidas (10 rodadas) e explicação de quando o paralelo é mais lento</p>
+    </div>
+    <div class="content-grid">
+      <div class="card">
+        <h3>📊 Matriz 1000x1000 (47.698 objetos)</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Configuração</th>
+              <th>Tempo Médio</th>
+              <th>Speedup (S)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Sequencial</td><td>0.0303 s (±0.008s)</td><td>1.00x</td></tr>
+            <tr><td>Paralelo 2T</td><td>0.0231 s (±0.003s)</td><td><strong>1.31x</strong></td></tr>
+            <tr><td>Paralelo 4T</td><td>0.0211 s (±0.008s)</td><td><strong>1.44x</strong></td></tr>
+            <tr><td>Paralelo 8T</td><td>0.0269 s (±0.007s)</td><td>1.13x</td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top: 1rem; font-size: 1rem; color: #94a3b8;">
+          Medições representativas obtidas via média de 10 rodadas independentes (Requisito 36).
+        </p>
+      </div>
+      <div class="card">
+        <h3>❓ Requisito 38: Por que o Paralelo perde em matrizes pequenas?</h3>
+        <ul>
+          <li><strong>Matriz 5x5:</strong> Sequencial levou <code>1.0 µs</code> enquanto o Paralelo levou <code>1705 µs</code> (~1700x mais lento!).</li>
+          <li><strong>Custo de Criação de Threads:</strong> Chamar <code>pthread_create</code> e <code>pthread_join</code> envolve o kernel do SO e alocação de pilhas, consumindo dezenas de microssegundos.</li>
+          <li><strong>Granularidade Insuficiente:</strong> Processar 25 células é tão rápido que a sobrecarga (<em>overhead</em>) de coordenação supera em muito a computação útil.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Trabalho Prático 1 - Sistemas Operacionais</span>
+      <span>Slide 7 / 8</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 8: CONCLUSÕES -->
+  <div class="slide">
+    <div class="header">
+      <span class="institution">PUCRS | Sistemas Operacionais</span>
+      <span class="time-badge">Minuto 10: Conclusões e Demonstração</span>
+    </div>
+    <div>
+      <h2 class="title">7. Conclusões e Ferramentas Desenvolvidas</h2>
+      <p class="subtitle">Síntese dos resultados, domínio do trabalho e diferenciais do projeto</p>
+    </div>
+    <div class="content-grid">
+      <div class="card">
+        <h3>🏆 Objetivos Alcançados</h3>
+        <ul>
+          <li><strong>Conformidade Rigorosa:</strong> Padrão ANSI C (C89/C90) estrito com compilação limpa em <code>gcc -std=c89 -Wall -Wextra -pedantic -pthread</code>.</li>
+          <li><strong>Sincronização Segura:</strong> Barreira customizada para máxima portabilidade (macOS + Linux) e exclusão mútua garantida nas uniões de DSU.</li>
+          <li><strong>Estrutura Completa do Repositório:</strong> Código-fonte, testes automatizados, resultados de benchmarks e slides em PDF.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>💻 Demonstração e Visualizador Web</h3>
+        <ul>
+          <li><strong>Modo Terminal:</strong> Flags <code>--visual</code> para ver os objetos coloridos no terminal e demarcação de faixas de threads.</li>
+          <li><strong>Visualizador Interativo:</strong> Aplicativo web embutido (<code>visualizador.html</code>) permitindo desenho com o mouse, inspeção de fronteiras DSU e testes ao vivo.</li>
+          <li><strong>Repositório Público:</strong><br>
+            <a href="https://github.com/filipepereira03/T1-SISOP" style="color: #60a5fa; text-decoration: none; font-weight: 700; font-size: 1.2rem;">
+              github.com/filipepereira03/T1-SISOP
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Trabalho Prático 1 - Sistemas Operacionais | PUCRS</span>
+      <span>Slide 8 / 8</span>
+    </div>
+  </div>
+
+</body>
+</html>

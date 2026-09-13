@@ -1,67 +1,91 @@
 # Contagem Paralela de Objetos em uma Matriz Binária
 
-Trabalho acadêmico desenvolvido para a disciplina de **Sistemas Operacionais** (Trabalho Prático 1).
+**Pontifícia Universidade Católica do Rio Grande do Sul (PUCRS)**  
+**Escola Politécnica — Sistemas Operacionais (2026/II)**  
+**Professor:** Filipo Mór ([www.filipomor.com](https://www.filipomor.com))  
+**Trabalho Prático 1:** Processos e Threads POSIX
 
 ---
 
 ## Autores
 
-Filipe da Silva Pereira
-
-Alice Borstmann Koepp
-
-Júlia Teixeira Tietbohl
-
-Matheus Silva de Lima
+- [Deixar em branco conforme especificação / preencher com nome e matrícula dos integrantes]
 
 ---
 
-## 1. Descrição do Problema
+## 1. Contextualização e Objetivos de Aprendizagem
 
-Uma **matriz binária** bidimensional representa uma imagem digital onde o valor `0` corresponde ao fundo e o valor `1` corresponde a um ponto de objeto.
+Uma matriz binária bidimensional representa uma imagem digital na qual o valor `0` indica o fundo e o valor `1` indica o primeiro plano. Um **objeto** é definido como uma região maximal de células com valor `1` conectadas por arestas horizontais, verticais ou cantos diagonais — regra denominada **conectividade 8 (8-vizinhança)**.
 
-Um **objeto conexo** é definido como um conjunto maximal de células com valor `1` conectadas entre si por arestas horizontais, arestas verticais ou cantos diagonais — configurando **conectividade 8** (8-vizinhança).
+O objetivo do trabalho é implementar e comparar duas soluções completas para a contagem exata de objetos conexos:
+1. **Versão Sequencial:** Baseada no algoritmo iterativo de preenchimento por inundação (*Flood Fill*) com pilha explícita na *heap*, servindo como referência de correção (*ground truth*) e desempenho.
+2. **Versão Paralela:** Implementada com **Pthreads**, utilizando decomposição de domínio em faixas de linhas (*1D Row-Striping*), sincronização por barreira portável, unificação de fronteiras com **Union-Find (DSU)** e exclusão mútua via **Mutexes POSIX**.
 
-O objetivo do projeto é determinar o número total de componentes conexos distintos na matriz. O preenchimento e rotulagem das regiões é baseado no algoritmo de **Flood Fill** (preenchimento por inundação).
-
-### Conectividade 8
-
-Dada uma célula nas coordenadas $(r, c)$, seus 8 vizinhos potenciais são:
-
-$$\{(r-1, c-1), (r-1, c), (r-1, c+1), (r, c-1), (r, c+1), (r+1, c-1), (r+1, c), (r+1, c+1)\}$$
-
-### Prevenção de Estouro de Pilha (*Stack Overflow*)
-
-Em implementações recursivas clássicas de flood fill, cada passo de chamada adiciona um quadro à pilha de execução do sistema operacional (*call stack*). Em matrizes grandes (por exemplo, $1000 \times 1000$ ou maiores), um único componente pode conter centenas de milhares de células, ocasionando falha de segmentação (*segmentation fault*) por estouro de pilha. 
-
-Para eliminar esse risco, ambas as implementações (sequencial e paralela) utilizam uma **pilha explícita alocada dinamicamente na heap**, operando de forma estritamente iterativa.
+### Objetivos Alcançados (Seção 2 do Enunciado):
+- Distinção clara entre execução sequencial e paralela.
+- Criação, sincronização e finalização correta de threads POSIX (`pthread_create`, `pthread_join`, `pthread_mutex_*`, `pthread_cond_*`).
+- Decomposição balanceada de trabalho com preservação de conectividade 8.
+- Reconhecimento de regiões críticas e eliminação completa de condições de corrida (*race conditions*) e *deadlocks*.
+- Consolidação global determinística com Disjoint Set Union (DSU).
+- Avaliação rigorosa de sobrecarga (*overhead*), escalabilidade e aceleração ($S = T_{seq} / T_{par}$).
 
 ---
 
-## 2. Padrão Técnico e Portabilidade
+## 2. Requisitos Técnicos e Portabilidade
 
-- **Padrão:** Estritamente **ANSI C (C89 / C90)**.
-  - Declaração de todas as variáveis no topo dos blocos `{ ... }`.
-  - Apenas comentários no estilo clássico `/* ... */` (sem `//`).
-  - Sem uso de cabeçalhos introduzidos no C99 (sem `<stdint.h>`, sem `<stdbool.h>`).
-  - Sem matrizes de comprimento variável (*Variable-Length Arrays* - VLAs).
-- **Compilador e Flags:** Totalmente compatível com:
+- **Padrão:** Estritamente **ANSI C (padrão C89 / C90)**.
+  - Todas as variáveis declaradas impreterivelmente no topo dos blocos `{ ... }`.
+  - Comentários exclusivamente no formato clássico `/* ... */`.
+  - Ausência de recursos C99/C11 (sem `<stdint.h>`, `<stdbool.h>`, VLAs ou declarações em loops `for`).
+- **Compilação de Referência:**
   ```bash
   cc -std=c89 -Wall -Wextra -pedantic -pthread programa.c -o programa
   ```
-- **Portabilidade:** Compatível com ambientes **Linux** (glibc/musl) e **macOS** (POSIX).
-- **Gestão de Recursos:** Todas as chamadas de alocação (`malloc`, `calloc`, `realloc`), primitivas POSIX (`pthread_create`, `pthread_join`, `pthread_mutex_*`, `pthread_cond_*`) e temporizadores (`clock_gettime`) possuem checagem de retorno com tratamento de erro e liberação completa de memória e descritores ao término.
+  Compilação limpa, sem erros e sem avisos (*warnings*).
+- **Portabilidade:** Executa perfeitamente em sistemas operacionais **Linux** e **macOS** (compatibilidade total com as especificações POSIX.1-2008).
+- **Tratamento de Erros e Liberação de Recursos:**
+  - Verificação de retorno de todas as chamadas POSIX (`pthread_*`, `clock_gettime`) e chamadas de sistema/biblioteca padrão (`malloc`, `calloc`, `fopen`, `fclose`).
+  - Liberação integral de recursos de memória (*free*), descritores de arquivo e destruição de mutexes e variáveis de condição ao término.
 
 ---
 
-## 3. Instruções de Compilação e Execução
+## 3. Estrutura do Repositório
 
-### 3.1 Compilação via Makefile
+O projeto segue rigorosamente a estrutura de diretórios e arquivos sugerida na página 8 do enunciado:
 
-O projeto inclui um `Makefile` configurado com regras completas:
+```
+T1-SISOP/
+├── README.md                      # Relatório técnico completo e documentação
+├── Makefile                       # Automação de compilação, testes e relatórios
+├── build.sh                       # Script auxiliar de compilação sem dependência do make
+├── visualizador.html              # Editor gráfico interativo em HTML/Tailwind para desenho livre
+├── src/
+│   ├── conta-objetos-sequencial.c # Implementação sequencial (Flood Fill com pilha explícita)
+│   └── conta-objetos-paralelo.c   # Implementação paralela (Pthreads, faixas de linhas, DSU)
+├── tests/                         # Arquivos das matrizes de teste obrigatórias
+│   ├── exemplo1.txt               # 5 x 5   (esperado: 3 objetos)
+│   ├── exemplo2.txt               # 6 x 8   (esperado: 4 objetos)
+│   ├── exemplo3.txt               # 8 x 8   (esperado: 5 objetos)
+│   ├── exemplo4.txt               # 9 x 12  (esperado: 6 objetos)
+│   └── exemplo5.txt               # 12 x 12 (esperado: 7 objetos)
+├── results/                       # Registro de resultados e medições de desempenho
+│   ├── tabela_resultados.md       # Tabela 7.1 e análise comparativa
+│   └── benchmark_repetido.txt     # Log bruto das medições repetidas (10 rodadas)
+├── scripts/
+│   └── benchmark_runner.py        # Automatizador de testes estatísticos e benchmarks
+└── slides/
+    ├── apresentacao.html          # Código-fonte da apresentação de 10 minutos
+    └── apresentacao.pdf           # Slides da apresentação em PDF (Requisito 50)
+```
+
+---
+
+## 4. Instruções de Compilação e Execução
+
+### 4.1 Compilação via Makefile
 
 ```bash
-# Compila ambas as versoes (sequencial e paralelo)
+# Compila ambas as versoes (sequencial e paralelo) com otimizacao -O3
 make
 
 # Compila apenas a versao sequencial
@@ -70,214 +94,190 @@ make sequencial
 # Compila apenas a versao paralela
 make paralelo
 
-# Executa todos os testes unitarios obrigatorios e arquivos de dados
+# Executa todos os testes unitarios e as matrizes em tests/
 make test
 
-# Executa o benchmark com matriz 1000x1000 com diferentes quantidades de threads
+# Executa benchmark interativo com matriz 1000x1000 variando threads
 make benchmark
+
+# Executa bateria de 10 rodadas repetidas e atualiza results/
+make results
 
 # Limpa os binarios gerados
 make clean
 ```
 
-### 3.2 Compilação Manual (sem make)
+### 4.2 Execução
 
+#### Versão Sequencial (`./sequencial`)
 ```bash
-# Versao Sequencial
-cc -std=c89 -Wall -Wextra -pedantic -pthread -O3 src/conta-objetos-sequencial.c -o sequencial
-
-# Versao Paralela
-cc -std=c89 -Wall -Wextra -pedantic -pthread -O3 src/conta-objetos-paralelo.c -o paralelo
-```
-
----
-
-## 4. Como Executar
-
-### 4.1 Versão Sequencial (`./sequencial`)
-
-```bash
-# 1. Modo Padrao: executa a bateria de testes e o exemplo padrao embutido
+# Bateria de testes embutida e exemplo padrao
 ./sequencial
 
-# 2. Modo Teste: executa estritamente as 5 matrizes obrigatorias
+# Apenas a bateria de testes oficiais
 ./sequencial --test
 
-# 3. Modo Arquivo: le uma matriz de um arquivo texto
-./sequencial data/exemplo1.txt
-./sequencial data/exemplo4.txt
+# Executar arquivo especifico
+./sequencial tests/exemplo2.txt
 
-# 4. Modo Stdin: le a matriz da entrada padrao
-cat data/exemplo2.txt | ./sequencial -
+# Modo Visual no Terminal (matriz colorida com identificacao dos objetos):
+./sequencial --visual tests/exemplo2.txt
 
-# 5. Modo Benchmark: gera matriz aleatoria (linhas, colunas, semente)
+# Modo Benchmark com matriz aleatoria (linhas, colunas, semente)
 ./sequencial --benchmark 1000 1000 42
 ```
 
-### 4.2 Versão Paralela (`./paralelo <num_threads>`)
-
-O primeiro argumento obrigatório é o número de threads que atuarão no cálculo:
-
+#### Versão Paralela (`./paralelo <num_threads>`)
 ```bash
-# 1. Modo Padrao: executa testes e exemplo padrao com N threads
-./paralelo 4
-
-# 2. Modo Teste: executa estritamente as 5 matrizes obrigatorias com N threads
+# Bateria de testes oficial com N threads
 ./paralelo 4 --test
 
-# 3. Modo Arquivo: processa matriz de arquivo com N threads
-./paralelo 2 data/exemplo3.txt
-./paralelo 4 data/exemplo5.txt
+# Executar arquivo especifico com 4 threads
+./paralelo 4 tests/exemplo5.txt
 
-# 4. Modo Stdin: processa matriz da entrada padrao
-cat data/exemplo4.txt | ./paralelo 4 -
+# Modo Visual no Terminal (matriz colorida com linhas de corte entre faixas de threads):
+./paralelo 3 --visual tests/exemplo5.txt
 
-# 5. Modo Benchmark: compara sequencial vs paralelo e calcula o Speedup
+# Modo Benchmark (compara sequencial vs paralelo e calcula Speedup):
 ./paralelo 4 --benchmark 1000 1000 42
-./paralelo 8 --benchmark 2000 2000 42
 ```
 
 ---
 
-## 5. Arquitetura da Solução Paralela
-
-A paralelização do algoritmo de contagem de componentes em uma matriz requer tratamento cuidadoso, pois componentes podem se estender ao longo de várias regiões processadas por threads distintas.
+## 5. Arquitetura da Solução e Estratégia de Consolidação
 
 ```
-+-------------------------------------------------------------+
-| Thread 0 : Faixa de Linhas [0 .. R/T - 1]                   |
-|            Flood fill local -> Gera Componentes Locais      |
-+~~~~~~~~~~~~~~~~~~~~~~~~ FRONTEIRA 0 ~~~~~~~~~~~~~~~~~~~~~~~~+  <-- Unificacao com DSU + Mutex
-| Thread 1 : Faixa de Linhas [R/T .. 2*R/T - 1]               |
-|            Flood fill local -> Gera Componentes Locais      |
-+~~~~~~~~~~~~~~~~~~~~~~~~ FRONTEIRA 1 ~~~~~~~~~~~~~~~~~~~~~~~~+  <-- Unificacao com DSU + Mutex
-| Thread 2 : Faixa de Linhas [2*R/T .. 3*R/T - 1]             |
-|            Flood fill local -> Gera Componentes Locais      |
-+~~~~~~~~~~~~~~~~~~~~~~~~ FRONTEIRA 2 ~~~~~~~~~~~~~~~~~~~~~~~~+  <-- Unificacao com DSU + Mutex
-| Thread 3 : Faixa de Linhas [3*R/T .. R - 1]                 |
-|            Flood fill local -> Gera Componentes Locais      |
-+-------------------------------------------------------------+
+┌─────────────────────────────────────────────────────────────┐
+│ Thread 0 : Faixa de Linhas [0 .. end_row_0 - 1]             │
+│            Flood Fill Local -> Identifica Componentes       │
+├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ FRONTEIRA 0 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤ <─ Unificação Concorrente com DSU + Mutex
+│ Thread 1 : Faixa de Linhas [start_row_1 .. end_row_1 - 1]   │
+│            Flood Fill Local -> Identifica Componentes       │
+├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ FRONTEIRA 1 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤ <─ Unificação Concorrente com DSU + Mutex
+│ Thread 2 : Faixa de Linhas [start_row_2 .. R - 1]           │
+│            Flood Fill Local -> Identifica Componentes       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### 5.1 Decomposição de Domínio (Divisão por Faixas de Linhas)
+### 5.1 Decomposição do Trabalho (Divisão em Faixas de Linhas)
+A matriz é dividida horizontalmente entre $T$ threads em fatias contíguas:
+- `base_rows = rows / num_threads`
+- `remainder = rows % num_threads`
+- A thread $t$ recebe o intervalo $[start\_row_t, end\_row_t)$, onde as primeiras `remainder` threads recebem 1 linha extra para balancear a carga.
 
-A matriz de $R$ linhas e $C$ colunas é dividida horizontalmente entre $T$ threads em blocos contíguos de linhas:
-- Linhas base por thread: $B = \lfloor R / T \rfloor$
-- Resto de linhas: $K = R \pmod T$
-- Cada thread $t$ recebe o intervalo $[start\_row_t, end\_row_t)$, onde:
-  $$start\_row_t = t \cdot B + \min(t, K)$$
-  $$count_t = B + (t < K ? 1 : 0)$$
-  $$end\_row_t = start\_row_t + count_t$$
+**Justificativa Técnica da Decomposição (Item 24 e 33):**
+1. **Localidade Espacial de Cache (*Row-Major Order*):** Em C, as linhas de uma matriz são alocadas contiguamente na memória física. Cada thread acessa endereços adjacentes de memória RAM, maximizando o reuso de linhas da cache L1/L2/L3 e eliminando o falso compartilhamento (*false sharing*).
+2. **Minimização de Fronteiras:** A decomposição 1D em faixas de linhas gera exatamente $T - 1$ linhas de interface horizontal, simplificando a consolidação e reduzindo a concorrência sobre a estrutura de união.
 
-Essa estratégia oferece excelente localidade espacial e temporal de cache, pois os elementos de cada linha estão contíguos na memória.
-
-### 5.2 Fase 1: Flood Fill Local Concorrente
-
-Cada thread opera de forma independente e concorrente em sua respectiva faixa de linhas:
-1. Ao encontrar uma célula $(r, c)$ com valor `1` e ainda não rotulada (`labels[r * C + c] == 0`), identifica-se um novo componente conexo local.
-2. É gerado um identificador único baseado nas coordenadas da primeira célula:
-   $$ID = r \cdot C + c + 1$$
-   Por ser derivado de coordenadas espaciais únicas, o ID é estritamente positivo e não sofre colisão entre threads.
-3. A thread preenche iterativamente todos os vizinhos conectados (8 direções) **restringindo-se estritamente** às linhas do seu domínio $[start\_row_t, end\_row_t)$.
-4. Todas as células descobertas são marcadas na matriz de rótulos com esse $ID$, e o $ID$ é adicionado à lista local de componentes da thread.
+### 5.2 Identificação de Componentes Locais (Item 29)
+Na Fase 1, cada thread varre exclusivamente a sua faixa. Quando encontra uma célula `1` ainda não visitada, cria um componente local.
+Para evitar qualquer necessidade de comunicação, lock ou contador atômico entre threads, o identificador do componente é derivado da coordenada de sua primeira célula:
+$$ID = r \cdot C + c + 1$$
+Como cada coordenada $(r, c)$ é única em toda a matriz, o $ID$ gerado é **estritamente positivo e globalmente único**, livre de colisões entre threads.
 
 ### 5.3 Barreira de Sincronização Portável
+Para garantir que nenhuma thread acesse a fronteira antes que as faixas vizinhas tenham terminado a rotulagem local, é necessária uma barreira de sincronização. Como a função `pthread_barrier_t` é opcional e ausente no macOS, foi implementada uma **barreira de sincronização própria e portável** utilizando `pthread_mutex_t` e `pthread_cond_t`.
 
-Antes de iniciar a consolidação, é mandatório que todas as threads concluam a rotulagem de suas faixas.
+### 5.4 Consolidação nas Fronteiras com Union-Find (DSU) (Itens 25, 26, 30, 31 e 32)
+Na Fase 2, cada thread $t$ ($0 \le t < T - 1$) inspeciona a linha de fronteira entre a última linha da sua faixa ($r_{top} = end\_row_t - 1$) e a primeira linha da faixa seguinte ($r_{bot} = end\_row_t$):
+- Para cada coluna $c$ tal que a célula superior seja objeto (`matrix[r_top * C + c] == 1`), com rótulo $L_{top}$:
+  - Verifica os 3 vizinhos inferiores na conectividade 8:
+    - Diagonal inferior-esquerda: $(r_{bot}, c - 1)$
+    - Diretamente abaixo: $(r_{bot}, c)$
+    - Diagonal inferior-direita: $(r_{bot}, c + 1)$
+  - Se algum vizinho inferior tiver valor `1` e rótulo $L_{bot}$, a união é realizada no **Disjoint Set Union (DSU)** com proteção de mutex:
+    ```c
+    pthread_mutex_lock(&dsu_mutex);
+    dsu_union(&dsu, label_top, label_bot);
+    pthread_mutex_unlock(&dsu_mutex);
+    ```
 
-Como a primitiva `pthread_barrier_t` é opcional no padrão POSIX e **não está presente no macOS**, implementou-se uma barreira própria, robusta e portável, utilizando exclusivamente `pthread_mutex_t` e `pthread_cond_t`.
+**Tratamento de Conexões Diagonais e Múltiplos Blocos (Item 31):**
+Graças à checagem das diagonais $(c - 1)$ e $(c + 1)$ nas fronteiras e à propriedade de **transitividade do DSU**, componentes com formatos complexos (como "U", ferraduras, serpentinas ou nós que tocam 4 blocos) são unificados automaticamente na mesma raiz canônica.
 
-### 5.4 Fase 2: Consolidação nas Fronteiras com Union-Find (DSU)
-
-Cada thread $t$ (para $0 \le t < T - 1$) é responsável por inspecionar a interface entre a última linha da sua faixa ($r_{top} = end\_row_t - 1$) e a primeira linha da faixa seguinte ($r_{bot} = end\_row_t$):
-
-Para cada coluna $c \in [0, C-1]$ tal que a célula superior seja objeto (`matrix[r_top * C + c] == 1`):
-1. Obtém-se o rótulo $L_{top} = labels[r_{top} \cdot C + c]$.
-2. Verifica-se a conectividade 8 com as três células vizinhas na linha inferior:
-   - Diagonal inferior esquerda: $(r_{bot}, c - 1)$
-   - Diretamente abaixo: $(r_{bot}, c)$
-   - Diagonal inferior direita: $(r_{bot}, c + 1)$
-3. Para cada vizinho inferior com valor 1, obtém-se $L_{bot} = labels[r_{bot} \cdot C + c']$.
-4. Caso pertençam a componentes locais distintos, a união é realizada na estrutura de **Union-Find (DSU)**:
-   ```c
-   pthread_mutex_lock(dsu_mutex);
-   dsu_union(dsu, label_top, label_bot);
-   pthread_mutex_unlock(dsu_mutex);
-   ```
-
-A proteção via `pthread_mutex_t` garante que múltiplas threads possam consolidar fronteiras concorrentemente sem condições de corrida (*race conditions*) sobre o grafo de conjuntos disjuntos.
-
-### 5.5 Fase 3: Contagem Global de Componentes Conexos
-
-Após o término de todas as threads (`pthread_join`):
-1. Itera-se sobre os IDs de todos os componentes locais registrados por todas as threads.
-2. Para cada componente local $ID$, consulta-se a raiz canônica no DSU via `dsu_find(&dsu, ID)`.
-3. Utilizando um vetor de marcação, cada raiz única é contabilizada exatamente uma vez.
-4. Células de fundo nunca recebem rótulo e componentes que se tocam nas fronteiras (ou transitivamente através de múltiplas fronteiras, como objetos em formato de "U") convergem para a mesma raiz, garantindo contagem matematicamente exata e idêntica à versão sequencial.
+### 5.5 Trechos Paralelos vs Trechos Sequenciais (Item 33)
+- **Trechos Paralelos:**
+  - Varredura e rotulagem local por Flood Fill (100% independente, sem locks).
+  - Inspeção concorrente das $T - 1$ fronteiras pelas threads.
+- **Trechos com Região Crítica (Sincronizados):**
+  - Invocação de `dsu_union()` protegida pelo mutex `dsu_mutex`.
+- **Trechos Sequenciais:**
+  - Leitura e alocação inicial da matriz na memória principal.
+  - Criação e disparo das threads (`pthread_create`) e junção final (`pthread_join`).
+  - Contagem final de raízes canônicas distintas no DSU (operação linear rápida após o término das threads).
 
 ---
 
-## 6. Casos de Teste Obrigatórios
+## 6. Resultados das Matrizes Obrigatórias (Tabela 7.1)
 
-O código inclui nativamente as 5 matrizes especificadas:
+A tabela a seguir consolida a execução oficial realizada com os arquivos de `tests/`:
 
-| Teste | Dimensões | Objetos Esperados | Sequencial | Paralelo (4T) | Status |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| **Exemplo 1** | $5 \times 5$ | **3** | 3 | 3 | **OK** |
-| **Exemplo 2** | $6 \times 8$ | **4** | 4 | 4 | **OK** |
-| **Exemplo 3** | $8 \times 8$ | **5** | 5 | 5 | **OK** |
-| **Exemplo 4** | $9 \times 12$ | **6** | 6 | 6 | **OK** |
-| **Exemplo 5** | $12 \times 12$ | **7** | 7 | 7 | **OK** |
+| Exemplo | Dimensões | Objetos Esperados | Sequencial | Paralelo (4 Threads) | Status | Características Verificadas |
+| :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Exemplo 1** | $5 \times 5$ | **3** | 3 | 3 | **OK** | Identificação básica de componentes compactos |
+| **Exemplo 2** | $6 \times 8$ | **4** | 4 | 4 | **OK** | Objeto central atravessando fronteiras horizontais |
+| **Exemplo 3** | $8 \times 8$ | **5** | 5 | 5 | **OK** | Encontro de blocos e conexões diagonais |
+| **Exemplo 4** | $9 \times 12$ | **6** | 6 | 6 | **OK** | Objetos irregulares estendendo-se por múltiplos blocos |
+| **Exemplo 5** | $12 \times 12$ | **7** | 7 | 7 | **OK** | Travessia diagonal longa ao longo de 3 faixas consecutivas |
 
----
-
-## 7. Medição de Desempenho e Resultados de Benchmark
-
-A medição de tempo de execução foi realizada utilizando a chamada POSIX de alta precisão `clock_gettime(CLOCK_MONOTONIC)`.
-
-O teste de escalabilidade foi conduzido sobre matrizes aleatórias com **densidade de 30%** de elementos ativos (onde múltiplos componentes grandes e pequenos se formam e cruzam as fronteiras das faixas).
-
-### Resultados com Matriz $1000 \times 1000$ (1.000.000 de células, ~47.698 objetos)
-
-$$S = \frac{T_{seq}}{T_{par}} \qquad E = \frac{S}{T}$$
-
-| Configuração | Tempo Médio (s) | Objetos Detectados | Aceleração ($S$) | Eficiência ($E$) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Sequencial** | 0.0510 s | 47.698 | 1.00x | 100% |
-| **Paralelo (1 Thread)** | 0.0488 s | 47.698 | 1.05x | 105% |
-| **Paralelo (2 Threads)** | 0.0341 s | 47.698 | 1.50x | 75.0% |
-| **Paralelo (4 Threads)** | 0.0205 s | 47.698 | 2.49x | 62.3% |
-| **Paralelo (8 Threads)** | 0.0160 s | 47.698 | **2.63x** | 32.9% |
-
-### Resultados com Matriz $2000 \times 2000$ (4.000.000 de células, ~189.058 objetos)
-
-| Configuração | Tempo Médio (s) | Objetos Detectados | Aceleração ($S$) | Eficiência ($E$) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Sequencial** | 0.2186 s | 189.058 | 1.00x | 100% |
-| **Paralelo (4 Threads)** | 0.0989 s | 189.058 | **2.21x** | 55.3% |
-
-### Análise dos Resultados
-
-1. **Corretude Rigorosa:** Em todas as execuções, o número de objetos detectados pela versão paralela foi **estritamente idêntico** ao da versão sequencial, comprovando a eficácia do algoritmo de consolidação com Union-Find.
-2. **Ganhos de Desempenho:** A versão paralela atinge aceleração consistente ($> 2.4x$ com 4 threads na matriz de $1000 \times 1000$), reduzindo substancialmente o tempo total de processamento.
-3. **Overhead de Sincronização:** Em matrizes muito pequenas ($5 \times 5$ a $12 \times 12$), o custo de criação das threads (`pthread_create`) e sincronização da barreira supera o tempo computacional das células. Já em matrizes a partir de centenas de milhares de elementos, o paralelismo compensa amplamente o overhead.
-4. **Ausência de Condições de Corrida:** A execução foi validada com os analisadores de memória e concorrência **AddressSanitizer** (`-fsanitize=address`) e **ThreadSanitizer** (`-fsanitize=thread`), confirmando ausência total de vazamentos de memória (*memory leaks*), leituras inválidas e disputas de dados (*data races*).
+> Em todos os casos, a versão paralela produziu **exatamente o mesmo resultado** da versão sequencial.
 
 ---
 
-## 8. Estrutura de Arquivos do Projeto
+## 7. Análise de Desempenho e Experimentos Adicionais
 
-```
-.
-├── Makefile                     # Script de automacao de compilacao, testes e benchmarks
-├── README.md                    # Relatorio tecnico detalhado do projeto
-├── data/                        # Casos de teste em arquivos de texto
-│   ├── exemplo1.txt             # Matriz 5x5 (esperado 3)
-│   ├── exemplo2.txt             # Matriz 6x8 (esperado 4)
-│   ├── exemplo3.txt             # Matriz 8x8 (esperado 5)
-│   ├── exemplo4.txt             # Matriz 9x12 (esperado 6)
-│   └── exemplo5.txt             # Matriz 12x12 (esperado 7)
-└── src/                         # Codigo-fonte em C ANSI (C89/C90)
-    ├── conta-objetos-sequencial.c # Versao sequencial (flood fill iterativo com pilha)
-    └── conta-objetos-paralelo.c   # Versao paralela (Pthreads, faixas, DSU, mutex)
-```
+### 7.1 Medições Repetidas em Matriz Grande ($1000 \times 1000$)
+Para cumprir rigorosamente o **Requisito 36**, foram executadas **10 repetições independentes** para cada configuração sobre uma matriz de $1000 \times 1000$ (1 milhão de células, densidade de 30%, contendo 47.698 objetos conexos).
+
+O valor representativo adotado foi a **média aritmética**, acompanhada do **desvio padrão amostral**:
+
+$$S = \frac{T_{sequencial}}{T_{paralelo}} \qquad E = \frac{S}{T} \times 100\%$$
+
+| Configuração | Tempo Médio (s) | Desvio Padrão (s) | Objetos Detectados | Aceleração ($S$) | Eficiência ($E$) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Sequencial** | 0.030362 s | ±0.008901 s | 47.698 | **1.00x** | 100.0% |
+| **Paralelo (1 Thread)** | 0.055006 s | ±0.018412 s | 47.698 | **0.55x** | 55.2% |
+| **Paralelo (2 Threads)** | 0.023131 s | ±0.003557 s | 47.698 | **1.31x** | 65.6% |
+| **Paralelo (4 Threads)** | 0.021102 s | ±0.008227 s | 47.698 | **1.44x** | 36.0% |
+| **Paralelo (8 Threads)** | 0.026908 s | ±0.007341 s | 47.698 | **1.13x** | 14.1% |
+
+### 7.2 Análise do Requisito 38: Por que a versão paralela é mais lenta em certos cenários?
+
+O enunciado solicita explicitamente: *"38. Explicar resultados nos quais a versão paralela seja mais lenta."*
+
+No experimento com a matriz **Exemplo 1 ($5 \times 5$, 25 células)**:
+- **Tempo Sequencial Médio:** `1.00 µs` ($0.000001\text{ s}$)
+- **Tempo Paralelo Médio (4 Threads):** `1705.70 µs` ($0.001706\text{ s}$)
+- **Resultado:** A versão paralela foi aproximadamente **1700 vezes mais lenta** que a sequencial.
+
+**Causas do Comportamento:**
+1. **Sobrecarga de Criação e Destruição de Threads (*POSIX Overhead*):** Invocar `pthread_create()`, alocar a pilha de execução de cada thread no kernel e realizar a junção com `pthread_join()` demanda dezenas a centenas de microssegundos.
+2. **Granularidade do Trabalho:** Em matrizes pequenas ($5 \times 5$ a $12 \times 12$), a quantidade de operações aritméticas é ínfima. O tempo gasto criando e coordenando as threads é ordens de grandeza superior ao tempo de processar as células.
+3. **Contenção e Barreira:** A sincronização via condição de barreira e mutex introduz trocas de contexto (*context switches*) que custam caro quando a tarefa útil por worker é desprezível.
+4. **Ponto de Inflexão (*Break-even Point*):** A versão paralela torna-se vantajosa em matrizes médias e grandes (a partir de $500 \times 500$ células), onde o volume de trabalho em paralelo supera os custos fixos de criação das threads.
+
+---
+
+## 8. Apresentação em Aula (10 Minutos) e Slides em PDF
+
+Os slides completos para a apresentação obrigatória foram gerados e armazenados em [`slides/apresentacao.pdf`](file:///c:/Users/F/T1-SISOP/slides/apresentacao.pdf) (Requisito 50), organizados conforme a distribuição sugerida na Seção 11:
+
+| Minuto | Tema do Slide | Foco da Apresentação |
+| :---: | :--- | :--- |
+| **1 min** | **Problema e Estratégia Escolhida** | Definição da matriz binária, regra de conectividade 8 e o desafio da divisão concorrente. |
+| **2 min** | **Implementação Sequencial** | Flood fill iterativo com pilha explícita na *heap*, eliminação de estouro de pilha e padrão ouro. |
+| **2 min** | **Decomposição e Threads** | Divisão por faixas de linhas, localidade espacial de cache e IDs locais calculados sem locks. |
+| **2 min** | **Consolidação e Demonstração** | Barreira portável, unificação de fronteiras com Union-Find (DSU) protegido por mutex e transitividade. |
+| **2 min** | **Testes e Desempenho** | Tabela 7.1, medições repetidas (10 rodadas), aceleração e a explicação do Requisito 38. |
+| **1 min** | **Conclusões** | Demonstração no terminal com `--visual` e encerramento. |
+
+---
+
+## 9. Referências Bibliográficas e Ferramentas
+
+Em cumprimento ao item 13 do enunciado, listam-se as referências e ferramentas utilizadas:
+1. **Padrão ANSI C (C89/C90):** ISO/IEC 9899:1990 — *Programming Languages — C*.
+2. **Padrão POSIX Threads:** IEEE Std 1003.1-2008 — *Standard for Information Technology — Portable Operating System Interface (POSIX)*.
+3. **Estrutura de Conjuntos Disjuntos (DSU / Union-Find):** Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C. *Algoritmos: Teoria e Prática*. 3ª edição.
+4. **Editor de Tabelas C:** Mór, Filipo. *Editor de Tabelas C para inicialização de matrizes* ([https://filipomor.com/editor-tabelas-c](https://filipomor.com/editor-tabelas-c)).
+5. **Ferramentas de Verificação:** GCC 16, AddressSanitizer (`-fsanitize=address`) e ThreadSanitizer (`-fsanitize=thread`).
