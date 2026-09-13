@@ -7,9 +7,12 @@ Trabalho acadêmico desenvolvido para a disciplina de **Sistemas Operacionais** 
 ## Autores
 
 Filipe da Silva Pereira
-Alice 
-Júlia Tietbohl
-Matheus
+
+Alice Borstmann Koepp
+
+Júlia Teixeira Tietbohl
+
+Matheus Silva de Lima
 
 ---
 
