@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualizador do Algoritmo — Contagem Paralela de Objetos</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f8f8f7;color:#1a1a18;padding:20px}
+h1{font-size:18px;font-weight:500;margin-bottom:4px;color:#1a1a18}
+.subtitle{font-size:13px;color:#888780;margin-bottom:16px}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tab{padding:7px 16px;border:0.5px solid #b4b2a9;border-radius:8px;background:#fff;color:#5f5e5a;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s}
+.tab.active{background:#185FA5;color:#fff;border-color:#185FA5}
+.controls{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;background:#fff;border:0.5px solid #d3d1c7;border-radius:8px;padding:10px 14px}
+.controls label{font-size:13px;color:#5f5e5a}
+.controls input[type=range]{width:110px;accent-color:#185FA5}
+.controls span{font-size:13px;font-weight:500;min-width:28px;color:#1a1a18}
+.btn{padding:6px 14px;border:0.5px solid #b4b2a9;border-radius:8px;background:#fff;color:#1a1a18;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:5px;transition:all .15s}
+.btn:hover{background:#f1efe8}
+.btn.primary{background:#185FA5;color:#fff;border-color:#185FA5}
+.btn.primary:hover{background:#0C447C}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.grid-wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.panel{flex:0 1 320px;min-width:260px}
+.panel-title{font-size:12px;color:#5f5e5a;margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+canvas{display:block;border:0.5px solid #d3d1c7;border-radius:8px;background:#fff;width:100%;max-width:320px;height:auto}
+.status-box{margin-top:10px;background:#fff;border:0.5px solid #d3d1c7;border-radius:8px;padding:10px 14px}
+.status{font-size:14px;color:#1a1a18;font-weight:500;min-height:20px}
+.step-info{font-size:12px;color:#888780;margin-top:3px;min-height:16px}
+.stats{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.stat{background:#fff;border:0.5px solid #d3d1c7;border-radius:8px;padding:8px 16px;text-align:center}
+.stat-val{font-size:22px;font-weight:500;color:#185FA5}
+.stat-lbl{font-size:11px;color:#888780;margin-top:2px}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:#5f5e5a}
+.legend-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0;border:0.5px solid rgba(0,0,0,0.12)}
+@media(max-width:600px){.grid-wrap{flex-direction:column}.panel{min-width:100%}}
+</style>
+</head>
+<body>
+
+<h1>Visualizador do Algoritmo</h1>
+<p class="subtitle">Contagem paralela de objetos em matriz binária — PUCRS Sistemas Operacionais 2026/II</p>
+
+<div class="tabs">
+  <button class="tab active" onclick="setMode('seq',this)">Flood fill sequencial</button>
+  <button class="tab" onclick="setMode('threads',this)">Divisão em threads</button>
+  <button class="tab" onclick="setMode('union',this)">Consolidação Union-Find</button>
+  <button class="tab" onclick="setMode('compare',this)">Sequencial vs paralelo</button>
+</div>
+
+<div class="controls">
+  <button class="btn primary" id="btnPlay" onclick="togglePlay()"><i class="ti ti-player-play"></i> <span id="playLabel">Iniciar</span></button>
+  <button class="btn" onclick="stepOnce()"><i class="ti ti-arrow-right"></i> Passo</button>
+  <button class="btn" onclick="resetAnim()"><i class="ti ti-refresh"></i> Reiniciar</button>
+  <label>Velocidade</label>
+  <input type="range" min="1" max="10" value="5" step="1" id="speedSlider" oninput="updateSpeed(this.value)">
+  <span id="speedOut">5</span>
+  <label style="margin-left:8px">Threads</label>
+  <input type="range" min="2" max="4" value="2" step="1" id="threadSlider" oninput="updateThreads(this.value)">
+  <span id="threadOut">2</span>
+</div>
+
+<div class="grid-wrap" id="gridWrap">
+  <div class="panel" id="panelLeft">
+    <div class="panel-title" id="titleLeft">Flood fill sequencial</div>
+    <canvas id="cvLeft" width="320" height="320"></canvas>
+    <div class="legend" id="legendLeft"></div>
+  </div>
+  <div class="panel" id="panelRight" style="display:none">
+    <div class="panel-title" id="titleRight">Paralelo</div>
+    <canvas id="cvRight" width="320" height="320"></canvas>
+    <div class="legend" id="legendRight"></div>
+  </div>
+</div>
+
+<div class="status-box">
+  <div class="status" id="status">Pressione Iniciar para começar</div>
+  <div class="step-info" id="stepInfo"></div>
+</div>
+<div class="stats" id="stats"></div>
+
+<script>
+var MODE='seq', playing=false, timer=null, speed=5, nThreads=2, step=0;
+var seqFrames=[], threadFrames=[], unionFrames=[], compareFrames=[];
+
+var MATRIX=[
+  [1,1,0,0,0,0,1,0],
+  [1,0,0,0,0,0,1,0],
+  [0,0,0,1,1,0,0,0],
+  [0,0,0,1,0,0,0,0],
+  [0,1,0,0,0,1,1,0],
+  [0,1,1,0,0,1,0,0],
+  [0,0,0,0,0,0,0,1],
+  [0,0,0,1,0,0,1,1]
+];
+var R=8,C=8;
+var COLORS_OBJ=['#378ADD','#1D9E75','#D85A30','#D4537E','#BA7517','#7F77DD','#639922','#E24B4A'];
+var THREAD_BG=['#B5D4F4','#9FE1CB','#F4C0D1','#FAC775'];
+var THREAD_FG=['#0C447C','#085041','#72243E','#633806'];
+
+function makeEmpty(){
+  var s=[];
+  for(var r=0;r<R;r++){s.push([]);for(var c=0;c<C;c++)s[r].push({bg:'#f1efe8',label:'',hi:false,fg:'#1a1a18'});}
+  return s;
+}
+function clone(s){return s.map(function(row){return row.map(function(c){return Object.assign({},c)})});}
+
+function drawGrid(cv,state,showLines,nT){
+  var ctx=cv.getContext('2d');
+  var W=cv.width,H=cv.height;
+  var cs=Math.min(W,H)/Math.max(R,C);
+  ctx.clearRect(0,0,W,H);
+  for(var r=0;r<R;r++){
+    for(var c=0;c<C;c++){
+      var x=c*cs+2,y=r*cs+2,w=cs-4,h=cs-4;
+      ctx.beginPath();
+      if(ctx.roundRect)ctx.roundRect(x,y,w,h,3);else ctx.rect(x,y,w,h);
+      if(MATRIX[r][c]===0){
+        ctx.fillStyle='#f8f8f7';ctx.fill();
+        ctx.strokeStyle='#d3d1c7';ctx.lineWidth=0.5;ctx.stroke();
+      } else {
+        var cell=state[r][c];
+        ctx.fillStyle=cell.bg;ctx.fill();
+        if(cell.hi){ctx.strokeStyle='#E24B4A';ctx.lineWidth=2.5;ctx.stroke();}
+        else{ctx.strokeStyle='rgba(0,0,0,0.1)';ctx.lineWidth=0.5;ctx.stroke();}
+        if(cell.label){
+          ctx.fillStyle=cell.fg;
+          ctx.font='bold '+(cs*0.32)+'px system-ui';
+          ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText(cell.label,x+w/2,y+h/2);
+        }
+      }
+    }
+  }
+  if(showLines&&nT){
+    var rpt=Math.floor(R/nT);
+    for(var t=1;t<nT;t++){
+      var yLine=t*rpt*cs;
+      ctx.strokeStyle='#E24B4A';ctx.lineWidth=2;
+      ctx.setLineDash([6,3]);
+      ctx.beginPath();ctx.moveTo(2,yLine);ctx.lineTo(W-2,yLine);ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle='#E24B4A';ctx.font='bold 10px system-ui';
+      ctx.textAlign='left';ctx.textBaseline='top';
+      ctx.fillText('fronteira '+t,4,yLine+2);
+    }
+  }
+}
+
+function buildSeq(){
+  var frames=[],vis=[],state=makeEmpty(),obj=0;
+  var DR=[-1,-1,-1,0,0,1,1,1],DC=[-1,0,1,-1,1,-1,0,1];
+  for(var r=0;r<R;r++){vis.push([]);for(var c=0;c<C;c++)vis[r].push(false);}
+  frames.push({s:clone(state),msg:'Matriz carregada. Iniciando varredura...',info:'',obj:0,done:false,lines:false});
+  for(var r=0;r<R;r++){
+    for(var c=0;c<C;c++){
+      if(MATRIX[r][c]===1&&!vis[r][c]){
+        obj++;
+        var col=COLORS_OBJ[(obj-1)%COLORS_OBJ.length];
+        var stk=[[r,c]];
+        vis[r][c]=true;
+        state[r][c]={bg:col,label:'',hi:true,fg:'#fff'};
+        frames.push({s:clone(state),msg:'Objeto '+obj+' encontrado em ('+r+','+c+')',info:'Célula adicionada à pilha. Verificando 8 vizinhos...',obj:obj,done:false,lines:false});
+        while(stk.length>0){
+          var top=stk.pop();
+          var tr=top[0],tc=top[1];
+          state[tr][tc]={bg:col,label:''+obj,hi:false,fg:'#fff'};
+          for(var k=0;k<8;k++){
+            var nr=tr+DR[k],nc=tc+DC[k];
+            if(nr>=0&&nr<R&&nc>=0&&nc<C&&MATRIX[nr][nc]===1&&!vis[nr][nc]){
+              vis[nr][nc]=true;
+              state[nr][nc]={bg:col,label:'',hi:true,fg:'#fff'};
+              stk.push([nr,nc]);
+              frames.push({s:clone(state),msg:'Objeto '+obj+': explorando ('+nr+','+nc+')',info:'Pilha: '+stk.length+' célula(s) pendente(s).',obj:obj,done:false,lines:false});
+            }
+          }
+          state[tr][tc]={bg:col,label:''+obj,hi:false,fg:'#fff'};
+        }
+        frames.push({s:clone(state),msg:'Objeto '+obj+' completo — pilha vazia.',info:'Continuando varredura...',obj:obj,done:false,lines:false});
+      }
+    }
+  }
+  frames.push({s:clone(state),msg:'Concluído! Total de objetos: '+obj,info:'Todos os objetos identificados com flood fill.',obj:obj,done:true,lines:false});
+  return frames;
+}
+
+function buildThreads(nT){
+  var frames=[],rpt=Math.floor(R/nT),state=makeEmpty();
+  var DR=[-1,-1,-1,0,0,1,1,1],DC=[-1,0,1,-1,1,-1,0,1];
+  frames.push({s:clone(state),msg:'Matriz dividida em '+nT+' faixas horizontais.',info:'Cada thread recebe ~'+rpt+' linhas. Nenhuma cruza a fronteira.',lines:true,nT:nT,done:false});
+  var vis=[],labels=[],obj=0;
+  for(var r=0;r<R;r++){vis.push([]);labels.push([]);for(var c=0;c<C;c++){vis[r].push(false);labels[r].push(0);}}
+  for(var t=0;t<nT;t++){
+    var sr=t*rpt,er=(t===nT-1)?R:sr+rpt;
+    var bg=THREAD_BG[t%4],fg=THREAD_FG[t%4];
+    for(var r=sr;r<er;r++){
+      for(var c=0;c<C;c++){
+        if(MATRIX[r][c]===1&&!vis[r][c]){
+          obj++;
+          var id=r*C+c+1;
+          var stk=[[r,c]];vis[r][c]=true;labels[r][c]=id;
+          while(stk.length>0){
+            var top=stk.pop();var tr=top[0],tc=top[1];
+            labels[tr][tc]=id;
+            state[tr][tc]={bg:bg,label:''+id,hi:false,fg:fg};
+            for(var k=0;k<8;k++){
+              var nr=tr+DR[k],nc=tc+DC[k];
+              if(nr>=sr&&nr<er&&nc>=0&&nc<C&&MATRIX[nr][nc]===1&&!vis[nr][nc]){vis[nr][nc]=true;labels[nr][nc]=id;stk.push([nr,nc]);}
+            }
+          }
+        }
+      }
+    }
+    frames.push({s:clone(state),msg:'Thread '+t+': flood fill nas linhas '+sr+' a '+(er-1)+' concluído.',info:obj+' componente(s) local(is) até agora.',lines:true,nT:nT,done:false});
+  }
+  frames.push({s:clone(state),msg:'Fase 1 completa: '+obj+' componentes locais identificados.',info:'Cada thread usou IDs únicos baseados em posição (r*C+c+1).',lines:true,nT:nT,done:true});
+  return frames;
+}
+
+function buildUnion(nT){
+  var frames=[],rpt=Math.floor(R/nT);
+  var DR=[-1,-1,-1,0,0,1,1,1],DC=[-1,0,1,-1,1,-1,0,1];
+  var vis=[],labels=[],state=makeEmpty(),obj=0;
+  for(var r=0;r<R;r++){vis.push([]);labels.push([]);for(var c=0;c<C;c++){vis[r].push(false);labels[r].push(0);}}
+  for(var t=0;t<nT;t++){
+    var sr=t*rpt,er=(t===nT-1)?R:sr+rpt;
+    var bg=THREAD_BG[t%4],fg=THREAD_FG[t%4];
+    for(var r=sr;r<er;r++){
+      for(var c=0;c<C;c++){
+        if(MATRIX[r][c]===1&&!vis[r][c]){
+          obj++;var id=r*C+c+1;var stk=[[r,c]];vis[r][c]=true;labels[r][c]=id;
+          while(stk.length>0){
+            var top=stk.pop();var tr=top[0],tc=top[1];labels[tr][tc]=id;
+            state[tr][tc]={bg:bg,label:''+id,hi:false,fg:fg};
+            for(var k=0;k<8;k++){
+              var nr=tr+DR[k],nc=tc+DC[k];
+              if(nr>=sr&&nr<er&&nc>=0&&nc<C&&MATRIX[nr][nc]===1&&!vis[nr][nc]){vis[nr][nc]=true;labels[nr][nc]=id;stk.push([nr,nc]);}
+            }
+          }
+        }
+      }
+    }
+  }
+  frames.push({s:clone(state),msg:'Fase 1 completa: '+obj+' componentes locais.',info:'Iniciando verificação das fronteiras...',lines:true,nT:nT,done:false});
+  var par=[];for(var i=0;i<=R*C+1;i++)par.push(i);
+  function find(x){while(par[x]!==x){par[x]=par[par[x]];x=par[x];}return x;}
+  function unite(a,b){a=find(a);b=find(b);if(a!==b)par[b]=a;}
+  var colorMap={};
+  for(var r=0;r<R;r++)for(var c=0;c<C;c++)if(labels[r][c]>0)colorMap[labels[r][c]]=state[r][c].bg;
+  for(var t2=0;t2<nT-1;t2++){
+    var rTop=(t2+1)*rpt-1,rBot=(t2+1)*rpt;
+    for(var c=0;c<C;c++){
+      if(MATRIX[rTop][c]===1){
+        for(var oc=-1;oc<=1;oc++){
+          var bc=c+oc;
+          if(bc>=0&&bc<C&&MATRIX[rBot][bc]===1){
+            var lT=labels[rTop][c],lB=labels[rBot][bc];
+            if(find(lT)!==find(lB)){
+              var pre=clone(state);
+              pre[rTop][c]=Object.assign({},pre[rTop][c],{hi:true});
+              pre[rBot][bc]=Object.assign({},pre[rBot][bc],{hi:true});
+              frames.push({s:pre,msg:'Fronteira '+t2+'/'+t2+'+1: ('+rTop+','+c+') toca ('+rBot+','+bc+') na diagonal!',info:'pthread_mutex_lock → dsu_union('+lT+', '+lB+') → pthread_mutex_unlock',lines:true,nT:nT,done:false});
+              unite(lT,lB);
+              var rootColor=COLORS_OBJ[find(lT)%COLORS_OBJ.length];
+              var post=clone(state);
+              for(var r2=0;r2<R;r2++)for(var c2=0;c2<C;c2++)if(labels[r2][c2]>0&&find(labels[r2][c2])===find(lT))post[r2][c2]=Object.assign({},post[r2][c2],{bg:rootColor,fg:'#fff',hi:false});
+              state=post;
+              frames.push({s:clone(state),msg:'Componentes unidos — mesma raiz no DSU.',info:'Mesma cor = mesmo objeto real.',lines:true,nT:nT,done:false});
+            }
+          }
+        }
+      }
+    }
+  }
+  var roots={};for(var r=0;r<R;r++)for(var c=0;c<C;c++)if(labels[r][c]>0)roots[find(labels[r][c])]=true;
+  var total=Object.keys(roots).length;
+  frames.push({s:clone(state),msg:'Consolidação completa! Total de objetos: '+total,info:'Raízes únicas no DSU = objetos reais na imagem.',lines:false,nT:nT,done:true,total:total});
+  return frames;
+}
+
+function buildCompare(nT){
+  var sF=buildSeq(),uF=buildUnion(nT),maxL=Math.max(sF.length,uF.length),out=[];
+  for(var i=0;i<maxL;i++)out.push({L:sF[Math.min(i,sF.length-1)],R:uF[Math.min(i,uF.length-1)],nT:nT});
+  return out;
+}
+
+function buildAll(){
+  seqFrames=buildSeq();
+  threadFrames=buildThreads(nThreads);
+  unionFrames=buildUnion(nThreads);
+  compareFrames=buildCompare(nThreads);
+}
+
+function getFrames(){
+  if(MODE==='seq')return seqFrames;
+  if(MODE==='threads')return threadFrames;
+  if(MODE==='union')return unionFrames;
+  return compareFrames;
+}
+
+function render(){
+  var cvL=document.getElementById('cvLeft'),cvR=document.getElementById('cvRight');
+  var fArr=getFrames(),idx=Math.min(step,fArr.length-1),f=fArr[idx];
+  var statusEl=document.getElementById('status'),infoEl=document.getElementById('stepInfo'),statsEl=document.getElementById('stats');
+  if(MODE==='compare'){
+    drawGrid(cvL,f.L.s,false,0);
+    drawGrid(cvR,f.R.s,f.R.lines,f.nT);
+    statusEl.textContent='SEQ: '+(f.L.msg||'')+'  |  PAR: '+(f.R.msg||'');
+    infoEl.textContent='Passo '+(idx+1)+' / '+fArr.length;
+    statsEl.innerHTML='';
+  } else {
+    drawGrid(cvL,f.s,f.lines,f.nT||nThreads);
+    statusEl.textContent=f.msg||'';
+    infoEl.textContent='Passo '+(idx+1)+' / '+fArr.length+(f.obj?' · Objeto: '+f.obj:'');
+    if(f.done&&f.total!=null){
+      statsEl.innerHTML='<div class="stat"><div class="stat-val">'+f.total+'</div><div class="stat-lbl">objetos encontrados</div></div>'+
+        '<div class="stat"><div class="stat-val">'+nThreads+'</div><div class="stat-lbl">threads usadas</div></div>';
+    } else if(f.done&&f.obj){
+      statsEl.innerHTML='<div class="stat"><div class="stat-val">'+f.obj+'</div><div class="stat-lbl">objetos encontrados</div></div>';
+    } else {statsEl.innerHTML='';}
+  }
+}
+
+function setMode(m,btn){
+  MODE=m;step=0;
+  if(playing)togglePlay();
+  document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('active')});
+  btn.classList.add('active');
+  var pR=document.getElementById('panelRight');
+  if(m==='compare'){
+    pR.style.display='';
+    document.getElementById('titleLeft').textContent='Sequencial';
+    document.getElementById('titleRight').textContent='Paralelo ('+nThreads+' threads)';
+  } else {
+    pR.style.display='none';
+    var t={seq:'Flood fill sequencial',threads:'Divisão em '+nThreads+' threads',union:'Consolidação Union-Find ('+nThreads+' threads)'};
+    document.getElementById('titleLeft').textContent=t[m]||m;
+  }
+  document.getElementById('stats').innerHTML='';
+  render();
+}
+
+function togglePlay(){
+  playing=!playing;
+  document.getElementById('playLabel').textContent=playing?'Pausar':'Iniciar';
+  document.getElementById('btnPlay').querySelector('i').className=playing?'ti ti-player-pause':'ti ti-player-play';
+  if(playing)tick(); else clearTimeout(timer);
+}
+
+function tick(){
+  if(!playing)return;
+  var fArr=getFrames();
+  if(step>=fArr.length-1){playing=false;document.getElementById('playLabel').textContent='Iniciar';document.getElementById('btnPlay').querySelector('i').className='ti ti-player-play';return;}
+  step++;render();
+  timer=setTimeout(tick,Math.max(140,1200-speed*90));
+}
+
+function stepOnce(){var fArr=getFrames();if(step<fArr.length-1){step++;render();}}
+function resetAnim(){if(playing)togglePlay();step=0;document.getElementById('stats').innerHTML='';render();}
+function updateSpeed(v){speed=parseInt(v);document.getElementById('speedOut').textContent=v;}
+function updateThreads(v){
+  nThreads=parseInt(v);document.getElementById('threadOut').textContent=v;
+  buildAll();resetAnim();
+  var t={seq:'Flood fill sequencial',threads:'Divisão em '+nThreads+' threads',union:'Consolidação Union-Find ('+nThreads+' threads)',compare:''};
+  if(MODE!=='compare')document.getElementById('titleLeft').textContent=t[MODE];
+  else document.getElementById('titleRight').textContent='Paralelo ('+nThreads+' threads)';
+}
+
+buildAll();render();
+</script>
+</body>
+</html>
