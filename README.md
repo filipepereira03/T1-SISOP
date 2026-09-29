@@ -9,7 +9,7 @@
 
 ## Autores
 
-- [Deixar em branco conforme especificação / preencher com nome e matrícula dos integrantes]
+**Preencher antes da entrega:** nomes e matrículas dos integrantes autorizados pela disciplina. O enunciado fornecido prevê trabalho individual ou em dupla; confirmem com o professor qualquer composição diferente.
 
 ---
 
@@ -25,7 +25,7 @@ O objetivo do trabalho é implementar e comparar duas soluções completas para 
 - Distinção clara entre execução sequencial e paralela.
 - Criação, sincronização e finalização correta de threads POSIX (`pthread_create`, `pthread_join`, `pthread_mutex_*`, `pthread_cond_*`).
 - Decomposição balanceada de trabalho com preservação de conectividade 8.
-- Reconhecimento de regiões críticas e eliminação completa de condições de corrida (*race conditions*) e *deadlocks*.
+- Reconhecimento de regiões críticas, proteção do DSU por mutex e tratamento de falhas nas etapas de criação e sincronização das threads.
 - Consolidação global determinística com Disjoint Set Union (DSU).
 - Avaliação rigorosa de sobrecarga (*overhead*), escalabilidade e aceleração ($S = T_{seq} / T_{par}$).
 
@@ -42,23 +42,24 @@ O objetivo do trabalho é implementar e comparar duas soluções completas para 
   cc -std=c89 -Wall -Wextra -pedantic -pthread programa.c -o programa
   ```
   Compilação limpa, sem erros e sem avisos (*warnings*).
-- **Portabilidade:** Executa perfeitamente em sistemas operacionais **Linux** e **macOS** (compatibilidade total com as especificações POSIX.1-2008).
+- **Portabilidade pretendida:** Usa APIs POSIX disponíveis em Linux e macOS. A compilação e execução nessas plataformas devem ser verificadas antes da entrega. A checagem local registrada nesta revisão usou GCC/MinGW no Windows.
 - **Tratamento de Erros e Liberação de Recursos:**
-  - Verificação de retorno de todas as chamadas POSIX (`pthread_*`, `clock_gettime`) e chamadas de sistema/biblioteca padrão (`malloc`, `calloc`, `fopen`, `fclose`).
-  - Liberação integral de recursos de memória (*free*), descritores de arquivo e destruição de mutexes e variáveis de condição ao término.
+  - Verificação das chamadas principais de criação, sincronização e junção de threads, alocações e relógio monotônico.
+  - Os workers aguardam um sinal de início; se a criação de alguma thread falhar, as já criadas são canceladas antes de processar a matriz.
+  - Um erro de alocação durante a rotulagem é propagado pela barreira para que nenhuma thread consolide rótulos incompletos. Se uma junção POSIX falhar, a função retorna erro sem liberar memória que ainda possa estar em uso.
 
 ---
 
 ## 3. Estrutura do Repositório
 
-O projeto segue rigorosamente a estrutura de diretórios e arquivos sugerida na página 8 do enunciado:
+O projeto contém os arquivos abaixo (a estrutura do enunciado era uma sugestão):
 
 ```
 T1-SISOP/
 ├── README.md                      # Relatório técnico completo e documentação
 ├── Makefile                       # Automação de compilação, testes e relatórios
-├── build.sh                       # Script auxiliar de compilação sem dependência do make
 ├── visualizador.html              # Editor gráfico interativo em HTML/Tailwind para desenho livre
+├── ROTEIRO_APRESENTACAO.md        # Conferência e roteiro do vídeo
 ├── src/
 │   ├── conta-objetos-sequencial.c # Implementação sequencial (Flood Fill com pilha explícita)
 │   └── conta-objetos-paralelo.c   # Implementação paralela (Pthreads, faixas de linhas, DSU)
@@ -67,12 +68,14 @@ T1-SISOP/
 │   ├── exemplo2.txt               # 6 x 8   (esperado: 4 objetos)
 │   ├── exemplo3.txt               # 8 x 8   (esperado: 5 objetos)
 │   ├── exemplo4.txt               # 9 x 12  (esperado: 6 objetos)
-│   └── exemplo5.txt               # 12 x 12 (esperado: 7 objetos)
+│   ├── exemplo5.txt               # 12 x 12 (esperado: 7 objetos)
+│   └── falhas_paralelo.c          # Testes de falhas de alocação e Pthreads
 ├── results/                       # Registro de resultados e medições de desempenho
 │   ├── tabela_resultados.md       # Tabela 7.1 e análise comparativa
 │   └── benchmark_repetido.txt     # Log bruto das medições repetidas (10 rodadas)
 ├── scripts/
-│   └── benchmark_runner.py        # Automatizador de testes estatísticos e benchmarks
+│   ├── benchmark_runner.py        # Automatizador de testes estatísticos e benchmarks
+│   └── test_failure_paths.py      # Executa falhas injetadas com limite de tempo
 └── slides/
     ├── apresentacao.html          # Código-fonte da apresentação de 10 minutos
     └── apresentacao.pdf           # Slides da apresentação em PDF (Requisito 50)
@@ -94,8 +97,11 @@ make sequencial
 # Compila apenas a versao paralela
 make paralelo
 
-# Executa todos os testes unitarios e as matrizes em tests/
+# Executa as matrizes obrigatorias e os testes de falhas
 make test
+
+# Executa apenas a injeção de falhas da versão paralela
+make test-failures
 
 # Executa benchmark interativo com matriz 1000x1000 variando threads
 make benchmark
@@ -166,7 +172,7 @@ A matriz é dividida horizontalmente entre $T$ threads em fatias contíguas:
 - A thread $t$ recebe o intervalo $[start\_row_t, end\_row_t)$, onde as primeiras `remainder` threads recebem 1 linha extra para balancear a carga.
 
 **Justificativa Técnica da Decomposição (Item 24 e 33):**
-1. **Localidade Espacial de Cache (*Row-Major Order*):** Em C, as linhas de uma matriz são alocadas contiguamente na memória física. Cada thread acessa endereços adjacentes de memória RAM, maximizando o reuso de linhas da cache L1/L2/L3 e eliminando o falso compartilhamento (*false sharing*).
+1. **Localidade Espacial (*Row-Major Order*):** A matriz é armazenada em ordem de linhas. Acessar faixas contíguas favorece a localidade de memória; o ganho de cache depende do hardware e da carga.
 2. **Minimização de Fronteiras:** A decomposição 1D em faixas de linhas gera exatamente $T - 1$ linhas de interface horizontal, simplificando a consolidação e reduzindo a concorrência sobre a estrutura de união.
 
 ### 5.2 Identificação de Componentes Locais (Item 29)
@@ -197,7 +203,7 @@ Graças à checagem das diagonais $(c - 1)$ e $(c + 1)$ nas fronteiras e à prop
 
 ### 5.5 Trechos Paralelos vs Trechos Sequenciais (Item 33)
 - **Trechos Paralelos:**
-  - Varredura e rotulagem local por Flood Fill (100% independente, sem locks).
+  - Varredura e rotulagem local por Flood Fill em faixas distintas, sem lock por célula.
   - Inspeção concorrente das $T - 1$ fronteiras pelas threads.
 - **Trechos com Região Crítica (Sincronizados):**
   - Invocação de `dsu_union()` protegida pelo mutex `dsu_mutex`.
@@ -227,7 +233,7 @@ A tabela a seguir consolida a execução oficial realizada com os arquivos de `t
 ## 7. Análise de Desempenho e Experimentos Adicionais
 
 ### 7.1 Medições Repetidas em Matriz Grande ($1000 \times 1000$)
-Para cumprir rigorosamente o **Requisito 36**, foram executadas **10 repetições independentes** para cada configuração sobre uma matriz de $1000 \times 1000$ (1 milhão de células, densidade de 30%, contendo 47.698 objetos conexos).
+O registro existente em `results/benchmark_repetido.txt` contém **10 repetições** para cada configuração numa matriz de $1000 \times 1000$ (densidade de 30%). Na máquina usada para esse registro, a matriz continha 47.698 objetos. Como a geração usa `rand()`, a mesma semente pode produzir outra matriz em outra biblioteca C; compare sequencial e paralelo sempre no mesmo ambiente e sobre os mesmos dados.
 
 O valor representativo adotado foi a **média aritmética**, acompanhada do **desvio padrão amostral**:
 
@@ -254,13 +260,13 @@ No experimento com a matriz **Exemplo 1 ($5 \times 5$, 25 células)**:
 1. **Sobrecarga de Criação e Destruição de Threads (*POSIX Overhead*):** Invocar `pthread_create()`, alocar a pilha de execução de cada thread no kernel e realizar a junção com `pthread_join()` demanda dezenas a centenas de microssegundos.
 2. **Granularidade do Trabalho:** Em matrizes pequenas ($5 \times 5$ a $12 \times 12$), a quantidade de operações aritméticas é ínfima. O tempo gasto criando e coordenando as threads é ordens de grandeza superior ao tempo de processar as células.
 3. **Contenção e Barreira:** A sincronização via condição de barreira e mutex introduz trocas de contexto (*context switches*) que custam caro quando a tarefa útil por worker é desprezível.
-4. **Ponto de Inflexão (*Break-even Point*):** A versão paralela torna-se vantajosa em matrizes médias e grandes (a partir de $500 \times 500$ células), onde o volume de trabalho em paralelo supera os custos fixos de criação das threads.
+4. **Ponto de Inflexão (*Break-even Point*):** A carga necessária para compensar a coordenação varia conforme processador, sistema e distribuição dos objetos. Os dados registrados não estabelecem um limite universal de tamanho.
 
 ---
 
 ## 8. Apresentação em Aula (10 Minutos) e Slides em PDF
 
-Os slides completos para a apresentação obrigatória foram gerados e armazenados em [`slides/apresentacao.pdf`](file:///c:/Users/F/T1-SISOP/slides/apresentacao.pdf) (Requisito 50), organizados conforme a distribuição sugerida na Seção 11:
+Os slides da apresentação estão em [`slides/apresentacao.pdf`](slides/apresentacao.pdf) (Requisito 50); o roteiro de vídeo dividido em quatro falas está em [`ROTEIRO_APRESENTACAO.md`](ROTEIRO_APRESENTACAO.md). A composição do grupo precisa ser confirmada com o professor, pois o enunciado prevê no máximo dois integrantes.
 
 | Minuto | Tema do Slide | Foco da Apresentação |
 | :---: | :--- | :--- |
@@ -279,5 +285,5 @@ Em cumprimento ao item 13 do enunciado, listam-se as referências e ferramentas 
 1. **Padrão ANSI C (C89/C90):** ISO/IEC 9899:1990 — *Programming Languages — C*.
 2. **Padrão POSIX Threads:** IEEE Std 1003.1-2008 — *Standard for Information Technology — Portable Operating System Interface (POSIX)*.
 3. **Estrutura de Conjuntos Disjuntos (DSU / Union-Find):** Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C. *Algoritmos: Teoria e Prática*. 3ª edição.
-4. **Editor de Tabelas C:** Mór, Filipo. *Editor de Tabelas C para inicialização de matrizes* ([https://filipomor.com/editor-tabelas-c](https://filipomor.com/editor-tabelas-c)).
-5. **Ferramentas de Verificação:** GCC 16, AddressSanitizer (`-fsanitize=address`) e ThreadSanitizer (`-fsanitize=thread`).
+4. **Editor de Tabelas C (opcional, citado no enunciado):** Mór, Filipo. [Editor de Tabelas C](https://filipomor.com/editor-tabelas-c). Confirmar no texto final quais ferramentas externas foram efetivamente usadas pelo grupo.
+5. **Verificação desta revisão:** GCC 16.1.0 (MinGW) com `-std=c89 -Wall -Wextra -pedantic -pthread`; testes de matrizes obrigatórias e injeção de falhas. Não há, nesta revisão, registro de execução de AddressSanitizer ou ThreadSanitizer.

@@ -148,6 +148,11 @@
       font-size: 1.1rem;
     }
 
+    /* Mantem a tabela de desempenho legivel na gravacao da tela. */
+    .performance-table { font-size: 0.98rem; table-layout: fixed; }
+    .performance-table th, .performance-table td { padding: 0.65rem 0.55rem; }
+    .performance-table th:first-child { width: 39%; }
+
     th, td {
       padding: 0.8rem 1rem;
       text-align: left;
@@ -253,7 +258,7 @@
     </div>
     <div>
       <h2 class="title">2. Implementação Sequencial de Referência</h2>
-      <p class="subtitle">Flood Fill iterativo com pilha explícita e prevenção de Stack Overflow</p>
+      <p class="subtitle">Flood fill iterativo com pilha explícita na memória dinâmica</p>
     </div>
     <div class="content-grid">
       <div class="card">
@@ -261,7 +266,7 @@
         <ul>
           <li><strong>Risco Recursivo:</strong> Em matrizes de 1.000.000 de células, um objeto longo pode disparar recursão de milhares de níveis, estourando a pilha de execução (<em>Stack Overflow</em>).</li>
           <li><strong>Solução:</strong> Pilha dinâmica explícita (<code>Stack</code>) alocada na <strong>heap</strong> com redimensionamento sob demanda.</li>
-          <li><strong>Complexidade Ótima:</strong> $O(N)$ em tempo e $O(N)$ em memória, garantindo execução ultrarrápida (1 a 3 microssegundos em matrizes pequenas).</li>
+          <li><strong>Complexidade:</strong> O(N) em tempo e O(N) em memória para N células.</li>
         </ul>
       </div>
       <div class="card">
@@ -293,7 +298,7 @@
       <div class="card">
         <h3>📐 Como as Linhas são Fatiadas?</h3>
         <ul>
-          <li>A matriz de $R$ linhas é dividida entre $T$ threads em blocos contíguos de linhas $[start\_row, end\_row)$.</li>
+          <li>A matriz de R linhas é dividida entre T threads em blocos contíguos de linhas <code>[start_row, end_row)</code>.</li>
           <li><strong>Distribuição Justa do Resto:</strong>
             <div class="code-box">
 base_rows = rows / num_threads;
@@ -336,11 +341,11 @@ count = base_rows + (thread_id < remainder ? 1 : 0);
         <h3>🤝 Barreira Portável e Inspeção de Bordas</h3>
         <ul>
           <li><strong>Compatibilidade macOS/Linux:</strong> Implementação de barreira com <code>pthread_mutex_t</code> e <code>pthread_cond_t</code> (pois <code>pthread_barrier_t</code> não existe no macOS).</li>
-          <li><strong>Checagem Concorrente de Fronteira:</strong> Cada thread $t$ verifica as células da sua última linha ($r_{top}$) contra as células da primeira linha da thread seguinte ($r_{bot}$):
+          <li><strong>Checagem Concorrente de Fronteira:</strong> Cada thread verifica sua última linha (<code>r_top</code>) contra a primeira linha da faixa seguinte (<code>r_bot</code>):
             <ul>
-              <li>Diagonal esquerda: $(r_{bot}, c - 1)$</li>
-              <li>Vertical abaixo: $(r_{bot}, c)$</li>
-              <li>Diagonal direita: $(r_{bot}, c + 1)$</li>
+              <li>Diagonal esquerda: <code>(r_bot, c - 1)</code></li>
+              <li>Vertical abaixo: <code>(r_bot, c)</code></li>
+              <li>Diagonal direita: <code>(r_bot, c + 1)</code></li>
             </ul>
           </li>
         </ul>
@@ -348,7 +353,7 @@ count = base_rows + (thread_id < remainder ? 1 : 0);
       <div class="card">
         <h3>🌲 Por que Union-Find (DSU) com Mutex?</h3>
         <ul>
-          <li>Ao detectar conexão entre rótulos $L_{top}$ e $L_{bot}$, executa:
+          <li>Ao detectar conexão entre rótulos <code>label_top</code> e <code>label_bot</code>, executa:
             <div class="code-box">
 pthread_mutex_lock(&dsu_mutex);
 dsu_union(&dsu, label_top, label_bot);
@@ -437,9 +442,8 @@ pthread_mutex_unlock(&dsu_mutex);
           </tr>
         </tbody>
       </table>
-      <div style="margin-top: 1.5rem; display: flex; gap: 2rem; font-size: 1.1rem; color: #94a3b8;">
-        <div>✔️ <strong>AddressSanitizer:</strong> Zero vazamentos de memória (0 memory leaks).</div>
-        <div>✔️ <strong>ThreadSanitizer:</strong> Zero condições de corrida (0 race conditions).</div>
+      <div style="margin-top: 1.5rem; font-size: 1.1rem; color: #94a3b8;">
+        Testes também disponíveis pelo terminal com <code>--test</code>, usando 1, 2 ou 4 threads.
       </div>
     </div>
     <div class="footer">
@@ -460,8 +464,8 @@ pthread_mutex_unlock(&dsu_mutex);
     </div>
     <div class="content-grid">
       <div class="card">
-        <h3>📊 Matriz 1000x1000 (47.698 objetos)</h3>
-        <table>
+        <h3>📊 Matriz 1000x1000: resultados registrados</h3>
+        <table class="performance-table">
           <thead>
             <tr>
               <th>Configuração</th>
@@ -477,7 +481,7 @@ pthread_mutex_unlock(&dsu_mutex);
           </tbody>
         </table>
         <p style="margin-top: 1rem; font-size: 1rem; color: #94a3b8;">
-          Medições representativas obtidas via média de 10 rodadas independentes (Requisito 36).
+          Médias de 10 rodadas no ambiente original. Tempos e matriz gerada por <code>rand()</code> podem variar em outro sistema.
         </p>
       </div>
       <div class="card">

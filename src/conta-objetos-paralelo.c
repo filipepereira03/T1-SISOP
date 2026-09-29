@@ -15,6 +15,7 @@
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+#include <limits.h>
 #include <pthread.h>
 
 #define TRUE 1
@@ -178,6 +179,10 @@ typedef struct {
     int count;
     int trip_count;
     int cycle;
+    int started;
+    int cancelled;
+    int failed;
+    int broken;
 } Barrier;
 
 static int barrier_init(Barrier *b, int count)
@@ -192,17 +197,69 @@ static int barrier_init(Barrier *b, int count)
     b->count = 0;
     b->trip_count = count;
     b->cycle = 0;
+    b->started = 0;
+    b->cancelled = 0;
+    b->failed = 0;
+    b->broken = 0;
     return 0;
 }
 
-static int barrier_wait(Barrier *b)
+/* Nenhum worker comeca antes de todas as threads serem criadas. */
+static int barrier_start_wait(Barrier *b)
+{
+    int cancelled;
+    if (pthread_mutex_lock(&b->mutex) != 0) {
+        return -1;
+    }
+    while (!b->started) {
+        if (pthread_cond_wait(&b->cond, &b->mutex) != 0) {
+            b->cancelled = 1;
+            b->started = 1;
+            pthread_cond_broadcast(&b->cond);
+            pthread_mutex_unlock(&b->mutex);
+            return -1;
+        }
+    }
+    cancelled = b->cancelled;
+    if (pthread_mutex_unlock(&b->mutex) != 0) {
+        return -1;
+    }
+    return cancelled ? 1 : 0;
+}
+
+static int barrier_start_release(Barrier *b, int cancelled)
+{
+    int rc;
+    if (pthread_mutex_lock(&b->mutex) != 0) {
+        return -1;
+    }
+    if (cancelled) {
+        b->cancelled = 1;
+    }
+    b->started = 1;
+    rc = pthread_cond_broadcast(&b->cond);
+    if (pthread_mutex_unlock(&b->mutex) != 0) {
+        return -1;
+    }
+    return rc == 0 ? 0 : -1;
+}
+
+static int barrier_wait(Barrier *b, int local_failed)
 {
     int my_cycle;
+    int failed;
 
     if (pthread_mutex_lock(&b->mutex) != 0) {
         return -1;
     }
+    if (b->broken) {
+        pthread_mutex_unlock(&b->mutex);
+        return 1;
+    }
     my_cycle = b->cycle;
+    if (local_failed) {
+        b->failed = 1;
+    }
     b->count++;
 
     if (b->count == b->trip_count) {
@@ -215,16 +272,22 @@ static int barrier_wait(Barrier *b)
     } else {
         while (my_cycle == b->cycle) {
             if (pthread_cond_wait(&b->cond, &b->mutex) != 0) {
+                b->failed = 1;
+                b->broken = 1;
+                b->cycle++;
+                b->count = 0;
+                pthread_cond_broadcast(&b->cond);
                 pthread_mutex_unlock(&b->mutex);
                 return -1;
             }
         }
     }
 
+    failed = b->failed;
     if (pthread_mutex_unlock(&b->mutex) != 0) {
         return -1;
     }
-    return 0;
+    return failed ? 1 : 0;
 }
 
 static void barrier_destroy(Barrier *b)
@@ -256,6 +319,7 @@ typedef struct {
     DSU *dsu;
     pthread_mutex_t *dsu_mutex;
     Barrier *barrier;
+    int failed;
 } ThreadData;
 
 /* Adiciona um ID de componente local descoberto pela thread */
@@ -289,13 +353,22 @@ static void *worker_func(void *arg)
     ThreadData *td = (ThreadData *)arg;
     Stack stk;
     int r, c, k;
+    int stack_initialized = 0;
+    int local_failed = 0;
     static const int dr[8] = {-1, -1, -1,  0, 0,  1, 1, 1};
     static const int dc[8] = {-1,  0,  1, -1, 1, -1, 0, 1};
 
+    if (barrier_start_wait(td->barrier) != 0) {
+        td->failed = 1;
+        return NULL;
+    }
+
     if (stack_init(&stk, 512) != 0) {
         fprintf(stderr, "Thread %d: Erro ao inicializar pilha\n", td->thread_id);
-        pthread_exit(NULL);
+        local_failed = 1;
+        goto local_done;
     }
+    stack_initialized = 1;
 
     /*
      * FASE 1: Flood Fill Local
@@ -315,15 +388,15 @@ static void *worker_func(void *arg)
                 if (thread_add_local_comp(td, comp_id) != 0) {
                     fprintf(stderr, "Thread %d: Erro de memoria ao registrar componente\n",
                             td->thread_id);
-                    stack_free(&stk);
-                    pthread_exit(NULL);
+                    local_failed = 1;
+                    goto local_done;
                 }
 
                 td->labels[idx] = comp_id;
                 if (stack_push(&stk, r, c) != 0) {
                     fprintf(stderr, "Thread %d: Erro ao empilhar\n", td->thread_id);
-                    stack_free(&stk);
-                    pthread_exit(NULL);
+                    local_failed = 1;
+                    goto local_done;
                 }
 
                 while (!stack_is_empty(&stk)) {
@@ -342,8 +415,8 @@ static void *worker_func(void *arg)
                                 if (stack_push(&stk, nr, nc) != 0) {
                                     fprintf(stderr, "Thread %d: Erro ao empilhar vizinho\n",
                                             td->thread_id);
-                                    stack_free(&stk);
-                                    pthread_exit(NULL);
+                                    local_failed = 1;
+                                    goto local_done;
                                 }
                             }
                         }
@@ -353,15 +426,18 @@ static void *worker_func(void *arg)
         }
     }
 
-    stack_free(&stk);
+local_done:
+    if (stack_initialized) {
+        stack_free(&stk);
+    }
 
     /*
      * Sincronizacao entre threads: todas devem concluir a rotulagem local
      * antes de qualquer thread inspecionar as fronteiras vizinhas.
      */
-    if (barrier_wait(td->barrier) != 0) {
-        fprintf(stderr, "Thread %d: Falha na barreira de sincronizacao\n", td->thread_id);
-        pthread_exit(NULL);
+    if (barrier_wait(td->barrier, local_failed) != 0) {
+        td->failed = 1;
+        return NULL;
     }
 
     /*
@@ -398,14 +474,16 @@ static void *worker_func(void *arg)
                                 /* Protege operacao de uniao no DSU compartilhado via mutex */
                                 if (pthread_mutex_lock(td->dsu_mutex) != 0) {
                                     perror("pthread_mutex_lock");
-                                    pthread_exit(NULL);
+                                    td->failed = 1;
+                                    return NULL;
                                 }
 
                                 dsu_union(td->dsu, label_top, label_bot);
 
                                 if (pthread_mutex_unlock(td->dsu_mutex) != 0) {
                                     perror("pthread_mutex_unlock");
-                                    pthread_exit(NULL);
+                                    td->failed = 1;
+                                    return NULL;
                                 }
                             }
                         }
@@ -415,7 +493,6 @@ static void *worker_func(void *arg)
         }
     }
 
-    pthread_exit(NULL);
     return NULL;
 }
 
@@ -520,11 +597,15 @@ int count_objects_parallel(const int *matrix, int rows, int cols, int num_thread
     int total_cells;
     int base_rows, remainder, curr_start;
     int t;
+    int created = 0;
+    int error = 0;
+    int joined_ok = 1;
     int total_objects = 0;
     unsigned char *counted_roots = NULL;
 
-    if (matrix == NULL || rows <= 0 || cols <= 0 || num_threads <= 0) {
-        return 0;
+    if (matrix == NULL || rows <= 0 || cols <= 0 || num_threads <= 0 ||
+        rows > INT_MAX / cols) {
+        return -1;
     }
 
     /* Ajusta numero de threads se exceder o numero de linhas */
@@ -594,6 +675,7 @@ int count_objects_parallel(const int *matrix, int rows, int cols, int num_thread
         td_array[t].dsu = &dsu;
         td_array[t].dsu_mutex = &dsu_mutex;
         td_array[t].barrier = &barrier;
+        td_array[t].failed = 0;
 
         curr_start += count;
     }
@@ -601,6 +683,8 @@ int count_objects_parallel(const int *matrix, int rows, int cols, int num_thread
     /* Inicio da medicao de tempo */
     if (clock_gettime(CLOCK_MONOTONIC, &ts_start) != 0) {
         perror("clock_gettime ts_start");
+        error = 1;
+        goto cleanup;
     }
 
     /* Criacao das threads */
@@ -608,25 +692,41 @@ int count_objects_parallel(const int *matrix, int rows, int cols, int num_thread
         int rc = pthread_create(&threads[t], NULL, worker_func, &td_array[t]);
         if (rc != 0) {
             fprintf(stderr, "Erro ao criar thread %d: %s\n", t, strerror(rc));
-            /* Em caso de falha, espera as threads ja criadas */
-            while (--t >= 0) {
-                pthread_join(threads[t], NULL);
-            }
-            free(threads);
-            free(td_array);
-            barrier_destroy(&barrier);
-            pthread_mutex_destroy(&dsu_mutex);
-            dsu_free(&dsu);
-            free(labels);
-            return -1;
+            error = 1;
+            break;
+        }
+        created++;
+    }
+
+    /* Em falha parcial, os workers ainda estao no portao inicial. */
+    if (barrier_start_release(&barrier, error) != 0) {
+        fprintf(stderr, "Erro ao liberar inicio das threads\n");
+        error = 1;
+        if (barrier_start_release(&barrier, 1) != 0) {
+            return -1; /* Estado POSIX incerto: nao liberar recursos em uso. */
         }
     }
 
     /* Aguarda a finalizacao de todos os workers */
-    for (t = 0; t < num_threads; t++) {
+    for (t = 0; t < created; t++) {
         int rc = pthread_join(threads[t], NULL);
         if (rc != 0) {
             fprintf(stderr, "Erro ao fazer join da thread %d: %s\n", t, strerror(rc));
+            joined_ok = 0;
+            error = 1;
+        }
+    }
+
+    if (!joined_ok) {
+        return -1; /* Nao liberar memoria possivelmente usada por worker. */
+    }
+    if (error) {
+        goto cleanup;
+    }
+    for (t = 0; t < created; t++) {
+        if (td_array[t].failed) {
+            error = 1;
+            goto cleanup;
         }
     }
 
@@ -635,9 +735,12 @@ int count_objects_parallel(const int *matrix, int rows, int cols, int num_thread
      * Cada componente local tem seu ID passado pela funcao dsu_find.
      * Contabiliza-se cada raiz unica exatamente uma vez.
      */
-    counted_roots = (unsigned char *)calloc((size_t)(total_cells + 1), sizeof(unsigned char));
+    counted_roots = (unsigned char *)calloc((size_t)total_cells + 1,
+                                            sizeof(unsigned char));
     if (counted_roots == NULL) {
         fprintf(stderr, "Erro ao alocar vetor de contagem de raizes\n");
+        error = 1;
+        goto cleanup;
     } else {
         for (t = 0; t < num_threads; t++) {
             size_t i;
@@ -656,6 +759,8 @@ int count_objects_parallel(const int *matrix, int rows, int cols, int num_thread
     /* Fim da medicao de tempo */
     if (clock_gettime(CLOCK_MONOTONIC, &ts_end) != 0) {
         perror("clock_gettime ts_end");
+        error = 1;
+        goto cleanup;
     }
 
     if (out_time != NULL) {
@@ -663,7 +768,8 @@ int count_objects_parallel(const int *matrix, int rows, int cols, int num_thread
                     (double)(ts_end.tv_nsec - ts_start.tv_nsec) / 1000000000.0;
     }
 
-    /* Liberacao de recursos */
+cleanup:
+    /* Liberacao de recursos apos todas as threads terem terminado. */
     for (t = 0; t < num_threads; t++) {
         if (td_array[t].local_comps != NULL) {
             free(td_array[t].local_comps);
@@ -676,7 +782,7 @@ int count_objects_parallel(const int *matrix, int rows, int cols, int num_thread
     dsu_free(&dsu);
     free(labels);
 
-    return total_objects;
+    return error ? -1 : total_objects;
 }
 
 /*
@@ -1064,8 +1170,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "  %s 4 data/exemplo1.txt     (processa matriz de arquivo)\n", argv[0]);
         fprintf(stderr, "  %s 4 --benchmark 1000 1000 (mede speedup em matriz 1000x1000)\n\n", argv[0]);
         printf("Executando bateria de testes padrao com 4 threads:\n");
-        run_all_tests(4);
-        return 0;
+        return run_all_tests(4);
     }
 
     num_threads = atoi(argv[1]);
@@ -1076,7 +1181,9 @@ int main(int argc, char *argv[])
 
     /* Caso sem argumento extra: executa testes e exemplo padrao */
     if (argc == 2) {
-        run_all_tests(num_threads);
+        if (run_all_tests(num_threads) != 0) {
+            return 1;
+        }
 
         printf("Executando exemplo padrao hardcoded (Exemplo 1 - 5x5) com %d threads:\n",
                num_threads);
@@ -1086,6 +1193,9 @@ int main(int argc, char *argv[])
         free_needed = FALSE;
 
         total_objects = count_objects_parallel(matrix, rows, cols, num_threads, &elapsed_parallel);
+        if (total_objects < 0) {
+            return 1;
+        }
         printf("Objetos encontrados: %d\n", total_objects);
         printf("Tempo paralelo: %.6f segundos\n", elapsed_parallel);
         return 0;
@@ -1103,6 +1213,10 @@ int main(int argc, char *argv[])
             return 1;
         }
         total_objects = count_objects_parallel(matrix, rows, cols, num_threads, &elapsed_parallel);
+        if (total_objects < 0) {
+            free(matrix);
+            return 1;
+        }
         print_visual_matrix_parallel(matrix, rows, cols, num_threads);
         printf("Objetos encontrados: %d\n", total_objects);
         printf("Tempo paralelo (%d threads): %.6f segundos\n", num_threads, elapsed_parallel);
@@ -1140,9 +1254,17 @@ int main(int argc, char *argv[])
 
         printf("Executando versao sequencial de referencia...\n");
         objects_seq = count_objects_seq_ref(matrix, rows, cols, &elapsed_seq);
+        if (objects_seq < 0) {
+            free(matrix);
+            return 1;
+        }
 
         printf("Executando versao paralela com %d threads...\n", num_threads);
         total_objects = count_objects_parallel(matrix, rows, cols, num_threads, &elapsed_parallel);
+        if (total_objects < 0) {
+            free(matrix);
+            return 1;
+        }
 
         printf("\n====================================================\n");
         printf("  RESULTADOS DO BENCHMARK (%dx%d, %d THREADS)\n", rows, cols, num_threads);
@@ -1183,6 +1305,12 @@ int main(int argc, char *argv[])
     }
 
     total_objects = count_objects_parallel(matrix, rows, cols, num_threads, &elapsed_parallel);
+    if (total_objects < 0) {
+        if (free_needed && matrix != NULL) {
+            free(matrix);
+        }
+        return 1;
+    }
     printf("Objetos encontrados: %d\n", total_objects);
     printf("Tempo paralelo (%d threads): %.6f segundos\n", num_threads, elapsed_parallel);
 

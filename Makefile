@@ -7,6 +7,7 @@
 CC ?= cc
 CFLAGS ?= -std=c89 -Wall -Wextra -pedantic -pthread -O3
 CPPFLAGS ?= -D_POSIX_C_SOURCE=200809L
+PYTHON ?= python3
 
 SRC_DIR = src
 TESTS_DIR = tests
@@ -15,7 +16,7 @@ DATA_DIR = data
 TARGET_SEQ = sequencial
 TARGET_PAR = paralelo
 
-.PHONY: all sequencial paralelo test benchmark results clean help
+.PHONY: all sequencial paralelo test test-failures benchmark results clean help
 
 all: sequencial paralelo
 
@@ -55,6 +56,11 @@ test: all
 		printf "Paralelo 4T: "; ./$(TARGET_PAR) 4 "$$file"; \
 		echo ""; \
 	done
+	$(MAKE) test-failures
+
+test-failures:
+	$(CC) $(CFLAGS) $(CPPFLAGS) tests/falhas_paralelo.c -o falhas-paralelo
+	$(PYTHON) scripts/test_failure_paths.py ./falhas-paralelo
 
 benchmark: all
 	@echo "=========================================================="
@@ -73,6 +79,7 @@ results: all
 
 clean:
 	rm -f $(TARGET_SEQ) $(TARGET_PAR) *.o
+	rm -f falhas-paralelo
 
 help:
 	@echo "Opcoes do Makefile:"
@@ -80,6 +87,7 @@ help:
 	@echo "  make sequencial   - Compila apenas a versao sequencial"
 	@echo "  make paralelo     - Compila apenas a versao paralela"
 	@echo "  make test         - Executa todos os testes unitarios e arquivos em tests/"
+	@echo "  make test-failures - Testa caminhos de erro da versao paralela"
 	@echo "  make benchmark    - Executa benchmark interativo variando threads"
 	@echo "  make results      - Executa bateria repetida de testes e atualiza results/"
 	@echo "  make clean        - Remove os executaveis gerados"

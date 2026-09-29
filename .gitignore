@@ -1,6 +1,7 @@
 # Binarios compilados
 sequencial
 paralelo
+falhas-paralelo
 *.exe
 *.o
 *.out
