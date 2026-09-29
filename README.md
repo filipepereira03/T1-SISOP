@@ -9,8 +9,15 @@
 
 ## Autores
 
+<<<<<<< HEAD
 **Preencher antes da entrega:** nomes e matrículas dos integrantes autorizados pela disciplina. O enunciado fornecido prevê trabalho individual ou em dupla; confirmem com o professor qualquer composição diferente.
 
+=======
+- Filipe da Silva Pereira
+- Júlia Teixeira Tietbohl 
+- Alice Borstmann Koepp
+- Matheus Silva de Lima
+>>>>>>> 0f9ed63311d1f466cb81d209e83002bdc918b235
 ---
 
 ## 1. Contextualização e Objetivos de Aprendizagem
@@ -280,6 +287,7 @@ Os slides da apresentação estão em [`slides/apresentacao.pdf`](slides/apresen
 ---
 
 ## 9. Referências Bibliográficas e Ferramentas
+## 8. Referências Bibliográficas e Ferramentas
 
 Em cumprimento ao item 13 do enunciado, listam-se as referências e ferramentas utilizadas:
 1. **Padrão ANSI C (C89/C90):** ISO/IEC 9899:1990 — *Programming Languages — C*.
