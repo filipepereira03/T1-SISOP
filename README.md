@@ -5,19 +5,17 @@
 **Professor:** Filipo Mór ([www.filipomor.com](https://www.filipomor.com))  
 **Trabalho Prático 1:** Processos e Threads POSIX
 
+**Repositório público:** [filipepereira03/T1-SISOP](https://github.com/filipepereira03/T1-SISOP)
+
 ---
 
 ## Autores
 
-<<<<<<< HEAD
-**Preencher antes da entrega:** nomes e matrículas dos integrantes autorizados pela disciplina. O enunciado fornecido prevê trabalho individual ou em dupla; confirmem com o professor qualquer composição diferente.
-
-=======
 - Filipe da Silva Pereira
 - Júlia Teixeira Tietbohl 
 - Alice Borstmann Koepp
 - Matheus Silva de Lima
->>>>>>> 0f9ed63311d1f466cb81d209e83002bdc918b235
+
 ---
 
 ## 1. Contextualização e Objetivos de Aprendizagem
@@ -49,7 +47,7 @@ O objetivo do trabalho é implementar e comparar duas soluções completas para 
   cc -std=c89 -Wall -Wextra -pedantic -pthread programa.c -o programa
   ```
   Compilação limpa, sem erros e sem avisos (*warnings*).
-- **Portabilidade pretendida:** Usa APIs POSIX disponíveis em Linux e macOS. A compilação e execução nessas plataformas devem ser verificadas antes da entrega. A checagem local registrada nesta revisão usou GCC/MinGW no Windows.
+- **Portabilidade:** Usa APIs POSIX disponíveis em Linux e macOS. A checagem local registrada nesta revisão usou GCC/MinGW no Windows; a compilação e execução em Linux devem ser verificadas antes da entrega.
 - **Tratamento de Erros e Liberação de Recursos:**
   - Verificação das chamadas principais de criação, sincronização e junção de threads, alocações e relógio monotônico.
   - Os workers aguardam um sinal de início; se a criação de alguma thread falhar, as já criadas são canceladas antes de processar a matriz.
@@ -66,7 +64,6 @@ T1-SISOP/
 ├── README.md                      # Relatório técnico completo e documentação
 ├── Makefile                       # Automação de compilação, testes e relatórios
 ├── visualizador.html              # Editor gráfico interativo em HTML/Tailwind para desenho livre
-├── ROTEIRO_APRESENTACAO.md        # Conferência e roteiro do vídeo
 ├── src/
 │   ├── conta-objetos-sequencial.c # Implementação sequencial (Flood Fill com pilha explícita)
 │   └── conta-objetos-paralelo.c   # Implementação paralela (Pthreads, faixas de linhas, DSU)
@@ -154,6 +151,44 @@ make clean
 # Modo Benchmark (compara sequencial vs paralelo e calcula Speedup):
 ./paralelo 4 --benchmark 1000 1000 42
 ```
+
+### 4.3 Teste completo em Linux
+
+São necessários `gcc`, `make`, `python3` e `git`. Em Ubuntu ou Debian, instale-os, se necessário:
+
+```bash
+sudo apt update
+sudo apt install build-essential python3 git
+```
+
+Em uma máquina Linux, obtenha o repositório e entre na pasta (se já estiver clonado, execute apenas `cd T1-SISOP`):
+
+```bash
+git clone https://github.com/filipepereira03/T1-SISOP.git
+cd T1-SISOP
+```
+
+Compile as duas versões com as opções C89/Pthreads do `Makefile` e rode a bateria completa:
+
+```bash
+make
+make test
+```
+
+As baterias devem informar `TODOS OS TESTES PASSARAM COM SUCESSO!`; os cinco arquivos devem produzir `3, 4, 5, 6, 7` objetos nas duas versões, e os quatro testes de falhas devem imprimir `OK`. Para conferir diretamente o exemplo 3:
+
+```bash
+./sequencial tests/exemplo3.txt
+./paralelo 4 tests/exemplo3.txt
+```
+
+Ambos devem imprimir `Objetos encontrados: 5`. Para testar desempenho em matriz grande com 2, 4 e 8 threads:
+
+```bash
+make benchmark
+```
+
+Para refazer as dez medições por configuração e gerar relatórios locais, execute `make results`. Esse comando **sobrescreve** `results/tabela_resultados.md` e `results/benchmark_repetido.txt`; os tempos variam entre máquinas. Confira as alterações com `git diff -- results/` antes de publicá-las.
 
 ---
 
@@ -273,7 +308,7 @@ No experimento com a matriz **Exemplo 1 ($5 \times 5$, 25 células)**:
 
 ## 8. Apresentação em Aula (10 Minutos) e Slides em PDF
 
-Os slides da apresentação estão em [`slides/apresentacao.pdf`](slides/apresentacao.pdf) (Requisito 50); o roteiro de vídeo dividido em quatro falas está em [`ROTEIRO_APRESENTACAO.md`](ROTEIRO_APRESENTACAO.md). A composição do grupo precisa ser confirmada com o professor, pois o enunciado prevê no máximo dois integrantes.
+Os slides da apresentação estão em [`slides/apresentacao.pdf`](slides/apresentacao.pdf) (Requisito 50). A apresentação será dividida entre os quatro integrantes.
 
 | Minuto | Tema do Slide | Foco da Apresentação |
 | :---: | :--- | :--- |
@@ -287,11 +322,10 @@ Os slides da apresentação estão em [`slides/apresentacao.pdf`](slides/apresen
 ---
 
 ## 9. Referências Bibliográficas e Ferramentas
-## 8. Referências Bibliográficas e Ferramentas
 
 Em cumprimento ao item 13 do enunciado, listam-se as referências e ferramentas utilizadas:
 1. **Padrão ANSI C (C89/C90):** ISO/IEC 9899:1990 — *Programming Languages — C*.
 2. **Padrão POSIX Threads:** IEEE Std 1003.1-2008 — *Standard for Information Technology — Portable Operating System Interface (POSIX)*.
 3. **Estrutura de Conjuntos Disjuntos (DSU / Union-Find):** Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C. *Algoritmos: Teoria e Prática*. 3ª edição.
-4. **Editor de Tabelas C (opcional, citado no enunciado):** Mór, Filipo. [Editor de Tabelas C](https://filipomor.com/editor-tabelas-c). Confirmar no texto final quais ferramentas externas foram efetivamente usadas pelo grupo.
-5. **Verificação desta revisão:** GCC 16.1.0 (MinGW) com `-std=c89 -Wall -Wextra -pedantic -pthread`; testes de matrizes obrigatórias e injeção de falhas. Não há, nesta revisão, registro de execução de AddressSanitizer ou ThreadSanitizer.
+4. **Visualizador HTML:** usa [Tailwind CSS](https://tailwindcss.com/) para a interface. É material de apoio à demonstração; as contagens avaliadas são produzidas pelos programas em C.
+5. **Verificação local registrada:** GCC 16.1.0 (MinGW) com `-std=c89 -Wall -Wextra -pedantic -pthread`; as cinco matrizes obrigatórias passaram nas versões sequencial e paralela.
